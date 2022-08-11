@@ -58,7 +58,10 @@ func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentity
 	svcAcct, _ := CreateServiceAccount(ctx, api.Projects.ServiceAccounts, input)
 	// TODO: binding, _ := BindServiceAccountUserRole(ctx, api, svcAcct)
 
-	// TODO func CreateServiceAccountIAMMember()
+	// Grant the cloud's runtime 'member' (k8s, cloud func, etc) access to the necessary 'role' for svcAcct
+	// this will come from the caller of the tf resource "mdxc_app_identity" (we dont know what runtime they are using for their app)
+	// google_service_account_iam_member
+	// TODO func CreateServiceAccountIAMMember(svcAcct, role, member)
 
 	return &massdriver.AppIdentityOutput{
 		GcpServiceAccount: iam.ServiceAccount{Email: svcAcct.Email},
