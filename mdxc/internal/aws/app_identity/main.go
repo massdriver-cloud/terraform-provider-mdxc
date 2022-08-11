@@ -5,7 +5,6 @@ import (
 	"context"
 	"terraform-provider-mdxc/mdxc/internal/massdriver"
 
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
@@ -26,16 +25,4 @@ func Create(ctx context.Context, api IAMCreateRoleAPI, input *massdriver.AppIden
 	}
 
 	return &appIdentityOutput, err
-}
-
-// Create an Amazon IAM service client
-func getClient() (*iam.Client, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		return nil, err
-	}
-
-	client := iam.NewFromConfig(cfg)
-
-	return client, err
 }

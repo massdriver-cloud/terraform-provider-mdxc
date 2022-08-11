@@ -9,3 +9,6 @@ type AppIdentityInput struct {
 type AppIdentityOutput struct {
 	AwsIamRole types.Role
 }
+
+// TBD: module or struct???
+// app_identity.Create(...) -> Cloud agnostic create
