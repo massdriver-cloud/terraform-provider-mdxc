@@ -2,15 +2,22 @@ package mdxc
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/iam/v1"
+	"google.golang.org/api/option"
 )
 
 var awsProviderSchema = schema.Schema{
@@ -142,8 +149,8 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	var diags diag.Diagnostics
 
 	var awsCfg *aws.Config
-	azureConfig := azureConfig{}
-	gcpConfig := gcpConfig{}
+	var azureCreds *azidentity.ClientSecretCredential
+	var gcpAuth oauth2.TokenSource
 
 	if aws, ok := d.Get("aws").([]interface{}); ok && len(aws) > 0 && aws[0] != nil {
 		log.Printf("[debug] Creating AWS client")
@@ -156,57 +163,21 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	if azure, ok := d.Get("azure").([]interface{}); ok && len(azure) > 0 && azure[0] != nil {
 		mappedAzureConfig := azure[0].(map[string]interface{})
-		if subscriptionId, ok := mappedAzureConfig["subscription_id"].(string); ok && subscriptionId != "" {
-			azureConfig.subscriptionId = subscriptionId
-		}
-		if clientId, ok := mappedAzureConfig["client_id"].(string); ok && clientId != "" {
-			azureConfig.clientId = clientId
-		}
-		if clientSecret, ok := mappedAzureConfig["client_secret"].(string); ok && clientSecret != "" {
-			azureConfig.clientSecret = clientSecret
-		}
-		if tenantId, ok := mappedAzureConfig["tenant_id"].(string); ok && tenantId != "" {
-			azureConfig.tenantId = tenantId
+		log.Printf("[debug] Creating Azure client")
+		azureCreds, diags = initializeAzureConfig(ctx, d, mappedAzureConfig)
+		if azureCreds == nil {
+			return nil, diags
 		}
 	}
 
 	if gcp, ok := d.Get("gcp").([]interface{}); ok && len(gcp) > 0 && gcp[0] != nil {
 		mappedGCPConfig := gcp[0].(map[string]interface{})
-		if credentials, ok := mappedGCPConfig["credentials"].(string); ok && credentials != "" {
-			gcpConfig.credentials = credentials
-		}
-		if project, ok := mappedGCPConfig["project"].(string); ok && project != "" {
-			gcpConfig.project = project
+		log.Printf("[debug] Creating GCP client")
+		gcpAuth, diags = initializeGCPConfig(ctx, d, mappedGCPConfig)
+		if azureCreds == nil {
+			return nil, diags
 		}
 	}
-
-	diags = append(diags, diag.Diagnostic{
-		Severity: diag.Warning,
-		Summary:  "azure.subscription_id: " + azureConfig.subscriptionId,
-	},
-		diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "azure.clientId: " + azureConfig.clientId,
-		},
-		diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "azure.client_secret: " + azureConfig.clientSecret,
-		},
-		diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "azure.tenant_id: " + azureConfig.tenantId,
-		},
-	)
-
-	diags = append(diags, diag.Diagnostic{
-		Severity: diag.Warning,
-		Summary:  "gcp.credentials: " + gcpConfig.credentials,
-	},
-		diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "gcp.project: " + gcpConfig.project,
-		},
-	)
 
 	log.Printf("[debug] Testing AWS Client")
 
@@ -232,6 +203,35 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 			Summary:  "aws sts get-caller-identity UserId: " + *out.UserId,
 		},
 	)
+
+	log.Printf("[debug] Testing Azure Client")
+
+	azToken, err := azureCreds.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{"https://storage.azure.com/.default"}})
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+	log.Printf("[debug] Tested Azure Client")
+	diags = append(diags, diag.Diagnostic{
+		Severity: diag.Warning,
+		Summary:  "azure token: " + azToken.Token,
+	},
+	)
+
+	service, err := iam.NewService(ctx, option.WithTokenSource(gcpAuth))
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+	resp, err := service.Projects.ServiceAccounts.List("projects/chris-hill-sandbox").Do()
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+	for i, v := range resp.Accounts {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Warning,
+			Summary:  "service account " + fmt.Sprint(i) + ": " + v.Email,
+		},
+		)
+	}
 
 	return "foo", diags
 }
@@ -262,6 +262,102 @@ func initializeAWSConfig(ctx context.Context, d *schema.ResourceData, awsMap map
 	cfg.Credentials = aws.NewCredentialsCache(provider)
 	log.Printf("[debug] AWS Config Created")
 	return &cfg, diags
+}
+
+func initializeAzureConfig(ctx context.Context, d *schema.ResourceData, azureMap map[string]interface{}) (*azidentity.ClientSecretCredential, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	azureConfig := azureConfig{}
+
+	if subscriptionId, ok := azureMap["subscription_id"].(string); ok && subscriptionId != "" {
+		azureConfig.subscriptionId = subscriptionId
+	}
+	if clientId, ok := azureMap["client_id"].(string); ok && clientId != "" {
+		azureConfig.clientId = clientId
+	}
+	if clientSecret, ok := azureMap["client_secret"].(string); ok && clientSecret != "" {
+		azureConfig.clientSecret = clientSecret
+	}
+	if tenantId, ok := azureMap["tenant_id"].(string); ok && tenantId != "" {
+		azureConfig.tenantId = tenantId
+	}
+
+	// log.Printf("[debug] Converting Azure values to config")
+	// builder := authentication.Builder{
+	// 	SubscriptionID: azureConfig.subscriptionId,
+	// 	ClientID:       azureConfig.clientId,
+	// 	ClientSecret:   azureConfig.clientSecret,
+	// 	TenantID:       azureConfig.tenantId,
+
+	// 	Environment:                    "public",
+	// 	MetadataHost:                   "",
+	// 	SupportsOIDCAuth:               false,
+	// 	SupportsManagedServiceIdentity: false,
+
+	// 	// Feature Toggles
+	// 	SupportsClientCertAuth:   true,
+	// 	SupportsClientSecretAuth: true,
+	// 	SupportsAzureCliToken:    true,
+	// 	SupportsAuxiliaryTenants: false,
+
+	// 	// Doc Links
+	// 	ClientSecretDocsLink: "https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/service_principal_client_secret",
+
+	// 	// Use MSAL
+	// 	UseMicrosoftGraph: true,
+	// }
+
+	// config, err := builder.Build()
+	// if err != nil {
+	// 	return nil, diag.Errorf("building AzureRM Client: %s", err)
+	// }
+	// terraformVersion := d.TerraformVersion
+	// if terraformVersion == "" {
+	// 	// Terraform 0.12 introduced this field to the protocol
+	// 	// We can therefore assume that if it's missing it's 0.10 or 0.11
+	// 	terraformVersion = "0.11+compatible"
+	// }
+	// clientBuilder := clients.ClientBuilder{
+	// 	AuthConfig:                  config,
+	// 	SkipProviderRegistration:    false,
+	// 	TerraformVersion:            terraformVersion,
+	// 	DisableCorrelationRequestID: false,
+	// 	DisableTerraformPartnerID:   false,
+	// 	StorageUseAzureAD:           false,
+	// }
+
+	cred, err := azidentity.NewClientSecretCredential(
+		azureConfig.tenantId,
+		azureConfig.clientId,
+		azureConfig.clientSecret,
+		nil,
+	)
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+
+	log.Printf("[debug] Azure Config Created")
+	return cred, diags
+}
+
+func initializeGCPConfig(ctx context.Context, d *schema.ResourceData, gcpMap map[string]interface{}) (oauth2.TokenSource, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	gcpConfig := gcpConfig{}
+
+	if credentials, ok := gcpMap["credentials"].(string); ok && credentials != "" {
+		gcpConfig.credentials = credentials
+	}
+	if project, ok := gcpMap["project"].(string); ok && project != "" {
+		gcpConfig.project = project
+	}
+
+	cfg, err := google.JWTConfigFromJSON([]byte(gcpConfig.credentials), "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+
+	tokenSource := cfg.TokenSource(ctx)
+	log.Printf("[debug] GCP Config Created")
+	return tokenSource, diags
 }
 
 func resourceTest() *schema.Resource {
