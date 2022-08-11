@@ -22,7 +22,6 @@ func NewService(ctx context.Context) (*iam.Service, error) {
 	return service, nil
 }
 
-//*iam.ProjectsServiceAccountsService
 type IAMServiceAccountAPI interface {
 	Create(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
 }
