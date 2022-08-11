@@ -31,12 +31,12 @@ func TestCreate(t *testing.T) {
 		return &iam.CreateRoleOutput{Role: role}, nil
 	})
 
-	// TODO: pass in a AppIdentityInput{}
 	appIdentityInput := massdriver.AppIdentityInput{
 		Name: aws.String("test"),
 	}
+
 	appIdentityOutput, _ := app_identity.Create(context.TODO(), m, &appIdentityInput)
-	got := *appIdentityOutput.Role.Arn
+	got := *appIdentityOutput.AwsIamRole.Arn
 	want := "arn:aws:iam::account:role/test"
 
 	if want != got {
