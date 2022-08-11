@@ -2,8 +2,6 @@
 // https://cloud.google.com/iam/docs/creating-managing-service-accounts#iam-service-accounts-create-go
 package app_identity
 
-// TODO: SA API Enablement
-
 import (
 	"context"
 	"fmt"
