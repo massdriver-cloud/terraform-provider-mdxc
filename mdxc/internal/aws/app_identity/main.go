@@ -5,11 +5,18 @@ import (
 	"context"
 	"terraform-provider-mdxc/mdxc/internal/massdriver"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type IAMCreateRoleAPI interface {
 	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns []func(*iam.Options)) (*iam.CreateRoleOutput, error)
+}
+
+// TODO: call this and inject into Create()
+func NewService(cfg aws.Config) *iam.Client {
+	client := iam.NewFromConfig(cfg)
+	return client
 }
 
 // Create an AWS IAM Role as a massdriver.AppIdentity
