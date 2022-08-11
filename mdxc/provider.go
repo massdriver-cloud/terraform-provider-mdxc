@@ -152,6 +152,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	var azureCreds *azidentity.ClientSecretCredential
 	var gcpAuth oauth2.TokenSource
 
+
 	if aws, ok := d.Get("aws").([]interface{}); ok && len(aws) > 0 && aws[0] != nil {
 		log.Printf("[debug] Creating AWS client")
 		mappedAWSConfig := aws[0].(map[string]interface{})
