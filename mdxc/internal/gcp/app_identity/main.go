@@ -11,6 +11,8 @@ import (
 )
 
 // TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
+// Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
+// but haven't seen tf provider client auth yet...
 func NewService(ctx context.Context) (*iam.Service, error) {
 	service, err := iam.NewService(ctx)
 	if err != nil {
@@ -20,11 +22,7 @@ func NewService(ctx context.Context) (*iam.Service, error) {
 	return service, nil
 }
 
-type IAMServiceAccountAPI interface {
-	Create(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
-}
-
-func CreateServiceAccount(ctx context.Context, serviceAcctApi IAMServiceAccountAPI, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
+func CreateServiceAccount(ctx context.Context, serviceAcctApi *iam.ProjectsServiceAccountsService, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: *input.Name,
 		ServiceAccount: &iam.ServiceAccount{
@@ -38,14 +36,15 @@ func CreateServiceAccount(ctx context.Context, serviceAcctApi IAMServiceAccountA
 	return serviceAcctApi.Create("projects/"+projectId, request).Do()
 }
 
+// Create a massdriver AppIdentity in GCP.
 func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
+	// We will need to apply a number of operations for GCP. We should use a backoff library and
+	// Dave's checkpointing idea to handle failures during the 'transaction'
+	// TODO: api enablement (we should be non-authoritative)
 	svcAcct, _ := CreateServiceAccount(ctx, api.Projects.ServiceAccounts, input)
+	// TODO func CreateProjectIAMBinding()
+	// TODO func CreateServiceAccountIAMMember()
 
-	// TODO:
-	// func CreateProjectIAMBinding()
-	// func CreateServiceAccountIAMMember()
-	// func APIEnablement
-	// func Create() -> calls all of above takes NewService, make the right service for each and passes it in.
 	return &massdriver.AppIdentityOutput{
 		GcpServiceAccount: iam.ServiceAccount{Email: svcAcct.Email},
 	}, nil
