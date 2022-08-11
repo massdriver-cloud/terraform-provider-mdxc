@@ -10,6 +10,8 @@ import (
 	"google.golang.org/api/iam/v1"
 )
 
+const rolesIamServiceAccountUser = "roles/iam.serviceAccountUser"
+
 // TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
 // Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
 // but haven't seen tf provider client auth yet...
@@ -22,6 +24,18 @@ func NewService(ctx context.Context) (*iam.Service, error) {
 	return service, nil
 }
 
+// BindServiceAccountUserRole binds the serviceAccountUser role to the iam.ServiceAccount
+func BindServiceAccountUserRole(ctx context.Context, api string, svcAcct *iam.ServiceAccount) *iam.Binding {
+	members := []string{fmt.Sprintf("serviceAccount:%s", svcAcct.Email)}
+
+	// @@HERE -> add the policy for _this_ SA to access rolesIamServiceAccountUser, which will result in an iam.Binding
+	// https://pkg.go.dev/google.golang.org/api/iam/v1#Binding
+	binding := iam.Binding{Role: rolesIamServiceAccountUser, Members: members}
+
+	return &binding
+}
+
+// CreateServiceAccount makes the service account identity for an app
 func CreateServiceAccount(ctx context.Context, serviceAcctApi *iam.ProjectsServiceAccountsService, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: *input.Name,
@@ -42,7 +56,8 @@ func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentity
 	// Dave's checkpointing idea to handle failures during the 'transaction'
 	// TODO: api enablement (we should be non-authoritative)
 	svcAcct, _ := CreateServiceAccount(ctx, api.Projects.ServiceAccounts, input)
-	// TODO func CreateProjectIAMBinding()
+	// TODO: binding, _ := BindServiceAccountUserRole(ctx, api, svcAcct)
+
 	// TODO func CreateServiceAccountIAMMember()
 
 	return &massdriver.AppIdentityOutput{

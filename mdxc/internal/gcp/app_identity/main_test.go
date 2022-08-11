@@ -16,13 +16,15 @@ import (
 	"google.golang.org/api/option"
 )
 
+// Testing using HTTP Service mock: https://github.com/googleapis/google-api-go-client/blob/main/testing.md
+
 func TestCreateServiceAccount(t *testing.T) {
 	appIdentityInput := massdriver.AppIdentityInput{
 		Name: aws.String("test"),
 	}
 
 	ctx := context.Background()
-	iamSvc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		createReq := iam.CreateServiceAccountRequest{}
 
 		body, _ := io.ReadAll(r.Body)
@@ -39,17 +41,29 @@ func TestCreateServiceAccount(t *testing.T) {
 		w.Write(b)
 	}))
 
-	defer iamSvc.Close()
-	svc, err := iam.NewService(ctx, option.WithoutAuthentication(), option.WithEndpoint(iamSvc.URL))
+	defer mock.Close()
+	iamSvc, err := iam.NewService(ctx, option.WithoutAuthentication(), option.WithEndpoint(mock.URL))
 	if err != nil {
 		t.Fatalf("unable to create client: %v", err)
 	}
 
-	m := svc.Projects.ServiceAccounts
+	mockSvc := iamSvc.Projects.ServiceAccounts
 
-	serviceAccount, _ := app_identity.CreateServiceAccount(context.TODO(), m, &appIdentityInput)
+	serviceAccount, _ := app_identity.CreateServiceAccount(context.TODO(), mockSvc, &appIdentityInput)
 	got := serviceAccount.Email
 	want := "test@PROJECT_ID.iam.gserviceaccount.com"
+
+	if want != got {
+		t.Errorf("expect %v, got %v", want, got)
+	}
+}
+
+func TestBindServiceAccountUserRole(t *testing.T) {
+	api := "WHICH_API_IS_USED_TO_BIND_A_ROLE_TO_MEMBERS???"
+	svcAcct := iam.ServiceAccount{Email: "test@foo123.iam.gserviceaccount.com"}
+	binding := app_identity.BindServiceAccountUserRole(context.TODO(), api, &svcAcct)
+	got := binding.Role
+	want := "roles/iam.serviceAccountUser"
 
 	if want != got {
 		t.Errorf("expect %v, got %v", want, got)
