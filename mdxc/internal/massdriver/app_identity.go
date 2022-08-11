@@ -1,13 +1,17 @@
 package massdriver
 
-import "github.com/aws/aws-sdk-go-v2/service/iam/types"
+import (
+	awsTypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	gcpTypes "google.golang.org/api/iam/v1"
+)
 
 type AppIdentityInput struct {
 	Name *string
 }
 
 type AppIdentityOutput struct {
-	AwsIamRole types.Role
+	AwsIamRole        awsTypes.Role
+	GcpServiceAccount gcpTypes.ServiceAccount
 }
 
 // TBD: module or struct???
