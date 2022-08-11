@@ -22,28 +22,35 @@ func NewService(ctx context.Context) (*iam.Service, error) {
 	return service, nil
 }
 
-// TODO: API Enablement
-// TODO: google_project_iam_binding
-// TODO: google_service_account_iam_member
-func Create(ctx context.Context, api string, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
-	// request := &iam.CreateServiceAccountRequest{
-	// 	AccountId: *input.Name,
-	// 	ServiceAccount: &iam.ServiceAccount{
-	// 		DisplayName: *input.Name,
-	// 	},
-	// }
+type IAMServiceAccountAPI interface {
+	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
+}
+
+func CreateServiceAccount(ctx context.Context, serviceAcctApi IAMServiceAccountAPI, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
+	request := &iam.CreateServiceAccountRequest{
+		AccountId: *input.Name,
+		ServiceAccount: &iam.ServiceAccount{
+			DisplayName: *input.Name,
+		},
+	}
 
 	//TODO: projectId must come from tfland
-	// projectId := "foo"
+	projectId := "foo"
 
-	// account, err := api.Projects.ServiceAccounts.Create("projects/"+projectId, request).Do()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("Projects.ServiceAccounts.Create: %v", err)
-	// }
-	// fmt.Fprintf(w, "Created service account: %v", account)
-	// return account, nil
+	return serviceAcctApi.Create("projects/"+projectId, request).Do()
+}
+
+func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
+	svcAcct, _ := CreateServiceAccount(ctx, api.Projects.ServiceAccounts, input)
+	_ = svcAcct
+
+	// TODO:
+	// func CreateProjectIAMBinding()
+	// func CreateServiceAccountIAMMember()
+	// func APIEnablement
+	// func Create() -> calls all of above takes NewService, make the right service for each and passes it in.
 
 	return &massdriver.AppIdentityOutput{
-		GcpServiceAccount: iam.ServiceAccount{Email: "test@PROJECT_ID.iam.gserviceaccount.com"},
+		GcpServiceAccount: iam.ServiceAccount{Email: svcAcct.Email},
 	}, nil
 }
