@@ -11,43 +11,20 @@ import (
 	"google.golang.org/api/iam/v1"
 )
 
-// type mockProjectsServiceAccountsCreateCall *iam.ProjectsServiceAccountsCreateCall
-
-// func (m *mockProjectsServiceAccountsCreateCall) Do(opts ...googleapi.CallOption) (*iam.ServiceAccount, error) {
-// 	return &iam.ServiceAccount{}, nil
-// }
-
 type mockProjectsServiceAccountsCreateCall iam.ProjectsServiceAccountsCreateCall
 
 func (m *mockProjectsServiceAccountsCreateCall) Do(opts ...googleapi.CallOption) (*iam.ServiceAccount, error) {
 	return &iam.ServiceAccount{}, nil
 }
 
-type mockCreateServiceAccountAPI func(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) mockProjectsServiceAccountsCreateCall
+type mockCreateServiceAccountAPI func(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *mockProjectsServiceAccountsCreateCall
 
-func (m mockCreateServiceAccountAPI) Create(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) mockProjectsServiceAccountsCreateCall {
-	return mockProjectsServiceAccountsCreateCall{}
+func (m mockCreateServiceAccountAPI) Create(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *mockProjectsServiceAccountsCreateCall {
+	return &mockProjectsServiceAccountsCreateCall{}
 }
 
-// func TestCreate(t *testing.T) {
-
-// 	appIdentityInput := massdriver.AppIdentityInput{
-// 		Name: aws.String("test"),
-// 	}
-
-// 	m, _ := mockNewIamServiceAccountsService()
-
-// 	appIdentityOutput, _ := app_identity.Create(context.TODO(), m, &appIdentityInput)
-// 	got := appIdentityOutput.GcpServiceAccount.Email
-// 	want := "test@PROJECT_ID.iam.gserviceaccount.com"
-
-// 	if want != got {
-// 		t.Errorf("expect %v, got %v", want, got)
-// 	}
-// }
-
 func CreateServiceAccount(t *testing.T) {
-	m := mockCreateServiceAccountAPI(func(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) mockProjectsServiceAccountsCreateCall {
+	m := mockCreateServiceAccountAPI(func(projectName string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *mockProjectsServiceAccountsCreateCall {
 		t.Helper()
 		// if params.RoleName == nil {
 		// 	t.Fatal("expect role name to not be nil")
@@ -57,7 +34,7 @@ func CreateServiceAccount(t *testing.T) {
 		// role := &types.Role{Arn: aws.String(arn)}
 		// return &iam.CreateRoleOutput{Role: role}, nil
 		mockCreateCall := mockProjectsServiceAccountsCreateCall{}
-		return mockCreateCall
+		return &mockCreateCall
 	})
 
 	appIdentityInput := massdriver.AppIdentityInput{
