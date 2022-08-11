@@ -1,0 +1,8 @@
+version: "3"
+services:
+  terraform-provider-mdxc:
+    build:
+      args:
+        USER: $USER
+      context: .
+      dockerfile: .devcontainer/Dockerfile
