@@ -152,62 +152,6 @@ func RemoveAccessPoliciesToServicePrincipal(ctx context.Context, sp *msgraph.Ser
 	return deleteErr
 }
 
-// This uses the "official" azure-sdk-for-go to create a new role definition but was giving errors
-// "Assignments to roles with DataActions and NotDataActions are not supported on API version '2015-07-01'. The minimum required API version for this operations is '2018-01-01-preview'
-// AddAccessPoliciesToServicePrincipal adds the access policies
-// from the connection to this azure service principal to give
-// it accesss to the azure cloud resources the app needs to connect to
-// func AddAccessPoliciesToServicePrincipal(ctx context.Context, azCreds *azidentity.DefaultAzureCredential, sp *msgraph.ServicePrincipal, policy Policy) error {
-// 	roleAssClient, err := armauthorization.NewRoleAssignmentsClient(AzureSubscriptionID, azCreds, nil)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	roleDefClient, err := armauthorization.NewRoleDefinitionsClient(azCreds, nil)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	pager := roleDefClient.NewListPager(policy.Scope,
-// 		&armauthorization.RoleDefinitionsClientListOptions{Filter: stringPtr(fmt.Sprintf("roleName eq '%s'", policy.RoleDefinitionName))})
-// 	roleDefs := []*armauthorization.RoleDefinition{}
-// 	for pager.More() {
-// 		nextResult, err := pager.NextPage(ctx)
-// 		if err != nil {
-// 			log.Fatalf("failed to advance page: %v", err)
-// 		}
-// 		roleDefs = append(roleDefs, nextResult.Value...)
-// 	}
-// 	if len(roleDefs) != 1 {
-// 		return fmt.Errorf("loading Role Definition List: could not find role '%s'", policy.RoleDefinitionName)
-// 	}
-// 	roleDefinitionId := *roleDefs[0].ID
-// 	ra, createErr := roleAssClient.Create(ctx,
-// 		policy.Scope,
-// 		uuid.New().String(), // this is a UUID for the role assignment must be unique should probably be more careful to use this from state in provider
-// 		armauthorization.RoleAssignmentCreateParameters{
-// 			Properties: &armauthorization.RoleAssignmentProperties{
-// 				PrincipalID:      sp.ID,
-// 				RoleDefinitionID: &roleDefinitionId,
-// 			},
-// 		},
-
-// 	)
-
-// 	if createErr != nil {
-// 		return createErr
-// 	}
-// 	logObject("role assignment", ra)
-// 	return nil
-// }
-
-// TODO pivot to this in the future not yet really stable on azure side for now going to use long lived credential.
-// // FederatedIdentityCredentialCreate creates the trust relationship
-// // between the KSA used to run the app and the service principal
-// // which has access to the azure cloud resources
-// func FederatedIdentityCredentialCreate(ctx context.Context, azCreds *azidentity.DefaultAzureCredential, principal interface{}) error {
-//   // TODO
-//   return nil
-// }
-
 func logObject(name string, obj interface{}) {
 	b, _ := json.MarshalIndent(obj, "", "  ")
 	log.Default().Printf("successfully created %s: %v\n", name, string(b))
