@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"terraform-provider-mdxc/internal/client"
 	"terraform-provider-mdxc/internal/cloud/aws"
-	"terraform-provider-mdxc/internal/cloud/azure"
 	"terraform-provider-mdxc/internal/cloud/gcp"
 	"terraform-provider-mdxc/internal/mdxc"
 
@@ -125,6 +125,10 @@ func Provider() *schema.Provider {
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	return providerConfigureWithInterfaceAssertion(ctx, d)
+}
+
+func providerConfigureWithInterfaceAssertion(ctx context.Context, d *schema.ResourceData) (client.MDXCClient, diag.Diagnostics) {
 
 	if awsBlock, ok := d.Get("aws").([]interface{}); ok && len(awsBlock) > 0 && awsBlock[0] != nil {
 		log.Printf("[debug] Creating AWS client")
@@ -132,11 +136,11 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return aws.Initialize(ctx, d, mappedAWSConfig)
 	}
 
-	if azureBlock, ok := d.Get("azure").([]interface{}); ok && len(azureBlock) > 0 && azureBlock[0] != nil {
-		log.Printf("[debug] Creating Azure client")
-		mappedAzureConfig := azureBlock[0].(map[string]interface{})
-		return azure.Initialize(ctx, d, mappedAzureConfig)
-	}
+	// if azureBlock, ok := d.Get("azure").([]interface{}); ok && len(azureBlock) > 0 && azureBlock[0] != nil {
+	// 	log.Printf("[debug] Creating Azure client")
+	// 	mappedAzureConfig := azureBlock[0].(map[string]interface{})
+	// 	return azure.Initialize(ctx, d, mappedAzureConfig)
+	// }
 
 	if gcpBlock, ok := d.Get("gcp").([]interface{}); ok && len(gcpBlock) > 0 && gcpBlock[0] != nil {
 		log.Printf("[debug] Creating GCP client")
