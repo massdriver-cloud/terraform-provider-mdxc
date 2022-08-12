@@ -30,7 +30,7 @@ var (
 )
 
 // ApplicationCreate creates an azure cloud applicaiton resource to
-// represent the kubenertes app
+// represent a massdriver app
 func ApplicationCreate(ctx context.Context, authorizer auth.Authorizer, name string) (*msgraph.Application, error) {
 	// TODO need to add create if not exist logic as this will create many apps with the same display name
 	ac := msgraph.NewApplicationsClient(AzureTenantID)
