@@ -113,7 +113,7 @@ func AddAccessPoliciesToServicePrincipal(ctx context.Context, sp *msgraph.Servic
 		RoleAssignmentProperties: &authorization.RoleAssignmentProperties{
 			RoleDefinitionID: &roleDefinitionId,
 			PrincipalID:      sp.ID,
-			PrincipalType:   authorization.ServicePrincipal,
+			PrincipalType:    authorization.ServicePrincipal,
 		},
 	}
 	ra, createErr := roleAssClient.Create(
@@ -126,6 +126,30 @@ func AddAccessPoliciesToServicePrincipal(ctx context.Context, sp *msgraph.Servic
 	}
 	logObject("role assignment", ra)
 	return nil
+}
+
+func RemoveAccessPoliciesToServicePrincipal(ctx context.Context, sp *msgraph.ServicePrincipal, policy Policy, policyUUID string) error {
+	authorizer, err := azauth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		return err
+	}
+	roleAssClient := authorization.NewRoleAssignmentsClient(AzureSubscriptionID)
+	roleAssClient.Authorizer = authorizer
+	roleDefClient := authorization.NewRoleDefinitionsClient(AzureSubscriptionID)
+	roleDefClient.Authorizer = authorizer
+	roleDefinitions, err := roleDefClient.List(ctx, policy.Scope, fmt.Sprintf("roleName eq '%s'", policy.RoleDefinitionName))
+	if err != nil {
+		return fmt.Errorf("loading Role Definition List: %+v", err)
+	}
+	if len(roleDefinitions.Values()) != 1 {
+		return fmt.Errorf("loading Role Definition List: could not find role '%s'", policy.RoleDefinitionName)
+	}
+	_, deleteErr := roleAssClient.Delete(
+		ctx,
+		policy.Scope,
+		uuid.NewString(), // this is a GUID for the role assignment to ensure uniqueness we can probably be more careful about storing this id in state in the provider
+	)
+	return deleteErr
 }
 
 // This uses the "official" azure-sdk-for-go to create a new role definition but was giving errors
