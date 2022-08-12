@@ -14,8 +14,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	// "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2020-04-01-preview/authorization"
+	azauth "github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/google/uuid"
 	"github.com/manicminer/hamilton/auth"
 	"github.com/manicminer/hamilton/environments"
 	"github.com/manicminer/hamilton/msgraph"
@@ -90,9 +92,15 @@ type Policy struct {
 // AddAccessPoliciesToServicePrincipal adds the access policies
 // from the connection to this azure service principal to give
 // it accesss to the azure cloud resources the app needs to connect to
-func AddAccessPoliciesToServicePrincipal(ctx context.Context, azCreds *azidentity.DefaultAzureCredential, sp *msgraph.ServicePrincipal, policy Policy) error {
+func AddAccessPoliciesToServicePrincipal(ctx context.Context, sp *msgraph.ServicePrincipal, policy Policy) error {
+	authorizer, err := azauth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		return err
+	}
 	roleAssClient := authorization.NewRoleAssignmentsClient(AzureSubscriptionID)
+	roleAssClient.Authorizer = authorizer
 	roleDefClient := authorization.NewRoleDefinitionsClient(AzureSubscriptionID)
+	roleDefClient.Authorizer = authorizer
 	roleDefinitions, err := roleDefClient.List(ctx, policy.Scope, fmt.Sprintf("roleName eq '%s'", policy.RoleDefinitionName))
 	if err != nil {
 		return fmt.Errorf("loading Role Definition List: %+v", err)
@@ -105,15 +113,67 @@ func AddAccessPoliciesToServicePrincipal(ctx context.Context, azCreds *azidentit
 		RoleAssignmentProperties: &authorization.RoleAssignmentProperties{
 			RoleDefinitionID: &roleDefinitionId,
 			PrincipalID:      sp.ID,
+			PrincipalType:   authorization.ServicePrincipal,
 		},
 	}
-	ra, createErr := roleAssClient.Create(ctx, policy.Scope, policy.RoleDefinitionName, properties)
+	ra, createErr := roleAssClient.Create(
+		ctx,
+		policy.Scope,
+		uuid.NewString(), // this is a GUID for the role assignment to ensure uniqueness we can probably be more careful about storing this id in state in the provider
+		properties)
 	if createErr != nil {
-		return createErr 
+		return createErr
 	}
 	logObject("role assignment", ra)
 	return nil
 }
+
+// This uses the "official" azure-sdk-for-go to create a new role definition but was giving errors
+// "Assignments to roles with DataActions and NotDataActions are not supported on API version '2015-07-01'. The minimum required API version for this operations is '2018-01-01-preview'
+// AddAccessPoliciesToServicePrincipal adds the access policies
+// from the connection to this azure service principal to give
+// it accesss to the azure cloud resources the app needs to connect to
+// func AddAccessPoliciesToServicePrincipal(ctx context.Context, azCreds *azidentity.DefaultAzureCredential, sp *msgraph.ServicePrincipal, policy Policy) error {
+// 	roleAssClient, err := armauthorization.NewRoleAssignmentsClient(AzureSubscriptionID, azCreds, nil)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	roleDefClient, err := armauthorization.NewRoleDefinitionsClient(azCreds, nil)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	pager := roleDefClient.NewListPager(policy.Scope,
+// 		&armauthorization.RoleDefinitionsClientListOptions{Filter: stringPtr(fmt.Sprintf("roleName eq '%s'", policy.RoleDefinitionName))})
+// 	roleDefs := []*armauthorization.RoleDefinition{}
+// 	for pager.More() {
+// 		nextResult, err := pager.NextPage(ctx)
+// 		if err != nil {
+// 			log.Fatalf("failed to advance page: %v", err)
+// 		}
+// 		roleDefs = append(roleDefs, nextResult.Value...)
+// 	}
+// 	if len(roleDefs) != 1 {
+// 		return fmt.Errorf("loading Role Definition List: could not find role '%s'", policy.RoleDefinitionName)
+// 	}
+// 	roleDefinitionId := *roleDefs[0].ID
+// 	ra, createErr := roleAssClient.Create(ctx,
+// 		policy.Scope,
+// 		uuid.New().String(), // this is a UUID for the role assignment must be unique should probably be more careful to use this from state in provider
+// 		armauthorization.RoleAssignmentCreateParameters{
+// 			Properties: &armauthorization.RoleAssignmentProperties{
+// 				PrincipalID:      sp.ID,
+// 				RoleDefinitionID: &roleDefinitionId,
+// 			},
+// 		},
+
+// 	)
+
+// 	if createErr != nil {
+// 		return createErr
+// 	}
+// 	logObject("role assignment", ra)
+// 	return nil
+// }
 
 // TODO pivot to this in the future not yet really stable on azure side for now going to use long lived credential.
 // // FederatedIdentityCredentialCreate creates the trust relationship
@@ -140,7 +200,6 @@ func main() {
 	// Create default credentials from environment variables
 	appName := "foo"
 	ctx := context.Background()
-	azCreds, _ := azidentity.NewDefaultAzureCredential(nil)
 
 	environment := environments.Global
 
@@ -162,7 +221,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to obtain an azurecredential: %v", err)
 	}
-
 
 	// All the above will be replaced with wiring into mx provider
 
@@ -195,14 +253,18 @@ func main() {
 
 	policies := []Policy{
 		{
-			Scope:              AzureSubscriptionID,
+			Scope:              fmt.Sprintf("/subscriptions/%s", AzureSubscriptionID),
 			RoleDefinitionName: "Storage Blob Data Contributor",
 		},
 	}
 	for _, p := range policies {
-		if err := AddAccessPoliciesToServicePrincipal(ctx, azCreds, sp, p); err != nil {
+		if err := AddAccessPoliciesToServicePrincipal(ctx, sp, p); err != nil {
 			log.Fatalf("failed to add access policy: %v", err)
 		}
 	}
 
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
