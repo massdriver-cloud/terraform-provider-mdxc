@@ -2,6 +2,7 @@ package mdxc
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/iam/v1"
+	"google.golang.org/api/option"
 )
 
 var awsProviderSchema = schema.Schema{
@@ -145,7 +150,8 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	var awsCfg *aws.Config
 	var azureCreds *azidentity.ClientSecretCredential
-	gcpConfig := gcpConfig{}
+	var gcpAuth oauth2.TokenSource
+
 
 	if aws, ok := d.Get("aws").([]interface{}); ok && len(aws) > 0 && aws[0] != nil {
 		log.Printf("[debug] Creating AWS client")
@@ -167,23 +173,12 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	if gcp, ok := d.Get("gcp").([]interface{}); ok && len(gcp) > 0 && gcp[0] != nil {
 		mappedGCPConfig := gcp[0].(map[string]interface{})
-		if credentials, ok := mappedGCPConfig["credentials"].(string); ok && credentials != "" {
-			gcpConfig.credentials = credentials
-		}
-		if project, ok := mappedGCPConfig["project"].(string); ok && project != "" {
-			gcpConfig.project = project
+		log.Printf("[debug] Creating GCP client")
+		gcpAuth, diags = initializeGCPConfig(ctx, d, mappedGCPConfig)
+		if azureCreds == nil {
+			return nil, diags
 		}
 	}
-
-	diags = append(diags, diag.Diagnostic{
-		Severity: diag.Warning,
-		Summary:  "gcp.credentials: " + gcpConfig.credentials,
-	},
-		diag.Diagnostic{
-			Severity: diag.Warning,
-			Summary:  "gcp.project: " + gcpConfig.project,
-		},
-	)
 
 	log.Printf("[debug] Testing AWS Client")
 
@@ -222,6 +217,22 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		Summary:  "azure token: " + azToken.Token,
 	},
 	)
+
+	service, err := iam.NewService(ctx, option.WithTokenSource(gcpAuth))
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+	resp, err := service.Projects.ServiceAccounts.List("projects/chris-hill-sandbox").Do()
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+	for i, v := range resp.Accounts {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Warning,
+			Summary:  "service account " + fmt.Sprint(i) + ": " + v.Email,
+		},
+		)
+	}
 
 	return "foo", diags
 }
@@ -327,6 +338,27 @@ func initializeAzureConfig(ctx context.Context, d *schema.ResourceData, azureMap
 
 	log.Printf("[debug] Azure Config Created")
 	return cred, diags
+}
+
+func initializeGCPConfig(ctx context.Context, d *schema.ResourceData, gcpMap map[string]interface{}) (oauth2.TokenSource, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	gcpConfig := gcpConfig{}
+
+	if credentials, ok := gcpMap["credentials"].(string); ok && credentials != "" {
+		gcpConfig.credentials = credentials
+	}
+	if project, ok := gcpMap["project"].(string); ok && project != "" {
+		gcpConfig.project = project
+	}
+
+	cfg, err := google.JWTConfigFromJSON([]byte(gcpConfig.credentials), "https://www.googleapis.com/auth/cloud-platform")
+	if err != nil {
+		return nil, diag.FromErr(err)
+	}
+
+	tokenSource := cfg.TokenSource(ctx)
+	log.Printf("[debug] GCP Config Created")
+	return tokenSource, diags
 }
 
 func resourceTest() *schema.Resource {
