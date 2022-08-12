@@ -1,4 +1,4 @@
-package mdxc
+package provider
 
 import (
 	"testing"
