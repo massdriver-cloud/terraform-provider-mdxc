@@ -36,7 +36,7 @@ func AppIdentityResource() *schema.Resource {
 }
 
 func resourceAppIdentityCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	return meta.(client.MDXCClient).CreateAppIdentity(ctx, d, meta)
+	return meta.(client.MDXCClient).CreateApplicationIdentity(ctx, d)
 }
 
 func resourceAppIdentityRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -48,5 +48,5 @@ func resourceAppIdentityRead(ctx context.Context, d *schema.ResourceData, meta i
 // }
 
 func resourceAppIdentityDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	return meta.(client.MDXCClient).DeleteAppIdentity(ctx, d, meta)
+	return meta.(client.MDXCClient).DeleteApplicationIdentity(ctx, d)
 }

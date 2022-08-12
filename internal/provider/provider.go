@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log"
 	"terraform-provider-mdxc/internal/client"
-	"terraform-provider-mdxc/internal/cloud/aws"
-	"terraform-provider-mdxc/internal/cloud/gcp"
 	"terraform-provider-mdxc/internal/mdxc"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -125,27 +123,35 @@ func Provider() *schema.Provider {
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-	return providerConfigureWithInterfaceAssertion(ctx, d)
-}
-
-func providerConfigureWithInterfaceAssertion(ctx context.Context, d *schema.ResourceData) (client.MDXCClient, diag.Diagnostics) {
 
 	if awsBlock, ok := d.Get("aws").([]interface{}); ok && len(awsBlock) > 0 && awsBlock[0] != nil {
 		log.Printf("[debug] Creating AWS client")
 		mappedAWSConfig := awsBlock[0].(map[string]interface{})
-		return aws.Initialize(ctx, d, mappedAWSConfig)
+		mdxcClient, awsErr := client.MDXCClientFactory(ctx, mappedAWSConfig, "aws")
+		if awsErr != nil {
+			diag.FromErr(awsErr)
+		}
+		return mdxcClient, nil
 	}
 
-	// if azureBlock, ok := d.Get("azure").([]interface{}); ok && len(azureBlock) > 0 && azureBlock[0] != nil {
-	// 	log.Printf("[debug] Creating Azure client")
-	// 	mappedAzureConfig := azureBlock[0].(map[string]interface{})
-	// 	return azure.Initialize(ctx, d, mappedAzureConfig)
-	// }
+	if azureBlock, ok := d.Get("gcp").([]interface{}); ok && len(azureBlock) > 0 && azureBlock[0] != nil {
+		log.Printf("[debug] Creating GCP client")
+		mappedAzureConfig := azureBlock[0].(map[string]interface{})
+		mdxcClient, azureErr := client.MDXCClientFactory(ctx, mappedAzureConfig, "azure")
+		if azureErr != nil {
+			diag.FromErr(azureErr)
+		}
+		return mdxcClient, nil
+	}
 
 	if gcpBlock, ok := d.Get("gcp").([]interface{}); ok && len(gcpBlock) > 0 && gcpBlock[0] != nil {
 		log.Printf("[debug] Creating GCP client")
 		mappedGCPConfig := gcpBlock[0].(map[string]interface{})
-		return gcp.Initialize(ctx, d, mappedGCPConfig)
+		mdxcClient, gcpErr := client.MDXCClientFactory(ctx, mappedGCPConfig, "gcp")
+		if gcpErr != nil {
+			diag.FromErr(gcpErr)
+		}
+		return mdxcClient, nil
 	}
 
 	return nil, diag.FromErr(errors.New("At least one of 'aws', 'azure' or 'gcp' must be set"))

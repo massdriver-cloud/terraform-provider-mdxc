@@ -36,7 +36,7 @@ func NewIAMService(cfg *aws.Config) *iam.Client {
 // 	return &appIdentityOutput, err
 // }
 
-func (c *AWSClient) CreateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func (c *AWSConfig) CreateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	iamClient := NewIAMService(c.config)
 
 	assumeRolePolicy, assumeErr := structure.NormalizeJsonString(`
@@ -77,7 +77,7 @@ func (c *AWSClient) CreateAppIdentity(ctx context.Context, d *schema.ResourceDat
 	return nil
 }
 
-func (c *AWSClient) DeleteAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func (c *AWSConfig) DeleteAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	iamClient := NewIAMService(c.config)
 
 	roleInput := iam.DeleteRoleInput{
