@@ -5,9 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -122,37 +119,13 @@ func Provider() *schema.Provider {
 	}
 }
 
-type awsConfig struct {
-	awsRoleArn string
-	externalId string
-	region     string
-}
-type azureConfig struct {
-	subscriptionId string
-	clientId       string
-	clientSecret   string
-	tenantId       string
-}
-type gcpConfig struct {
-	credentials string
-	project     string
-}
-
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	var awsCfg *aws.Config
 	azureConfig := azureConfig{}
 	gcpConfig := gcpConfig{}
 
-	if aws, ok := d.Get("aws").([]interface{}); ok && len(aws) > 0 && aws[0] != nil {
-		log.Printf("[debug] Creating AWS client")
-		mappedAWSConfig := aws[0].(map[string]interface{})
-		awsCfg, diags = initializeAWSConfig(ctx, d, mappedAWSConfig)
-		if awsCfg == nil {
-			return nil, diags
-		}
-	}
+	client := NewMdxcClient(ctx, d)
 
 	if azure, ok := d.Get("azure").([]interface{}); ok && len(azure) > 0 && azure[0] != nil {
 		mappedAzureConfig := azure[0].(map[string]interface{})
@@ -210,10 +183,10 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	log.Printf("[debug] Testing AWS Client")
 
-	client := sts.NewFromConfig(*awsCfg)
+	awsClient := sts.NewFromConfig(client.AWS)
 	foo := sts.GetCallerIdentityInput{}
 	log.Printf("[debug] Right before AWS Client")
-	out, err := client.GetCallerIdentity(ctx, &foo)
+	out, err := awsClient.GetCallerIdentity(ctx, &foo)
 	if err != nil {
 		return nil, diag.FromErr(err)
 	}
@@ -234,34 +207,6 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	)
 
 	return "foo", diags
-}
-
-func initializeAWSConfig(ctx context.Context, d *schema.ResourceData, awsMap map[string]interface{}) (*aws.Config, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	awsConfig := awsConfig{}
-
-	if roleArn, ok := awsMap["role_arn"].(string); ok && roleArn != "" {
-		awsConfig.awsRoleArn = roleArn
-	}
-	if externalId, ok := awsMap["external_id"].(string); ok && externalId != "" {
-		awsConfig.externalId = externalId
-	}
-	if region, ok := awsMap["region"].(string); ok && region != "" {
-		awsConfig.region = region
-	}
-
-	log.Printf("[debug] Converting AWS values to config")
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(awsConfig.region))
-	if err != nil {
-		return nil, diag.FromErr(err)
-	}
-	stsClient := sts.NewFromConfig(cfg)
-	provider := stscreds.NewAssumeRoleProvider(stsClient, awsConfig.awsRoleArn, func(o *stscreds.AssumeRoleOptions) {
-		o.ExternalID = aws.String(awsConfig.externalId)
-	})
-	cfg.Credentials = aws.NewCredentialsCache(provider)
-	log.Printf("[debug] AWS Config Created")
-	return &cfg, diags
 }
 
 func resourceTest() *schema.Resource {
