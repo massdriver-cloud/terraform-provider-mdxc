@@ -184,6 +184,15 @@ func main() {
 	}
 	logObject("service principal password", spPass)
 
+	// these environment variables can be set in the pods that need access to cloud services via this service principal
+	// azure has not yet implemented stable workload identity so we are going to use the long lived credential for now
+	azCredEnv := map[string]string{
+		"AZURE_CLIENT_ID":     *sp.AppId,
+		"AZURE_CLIENT_SECRET": *spPass.SecretText,
+		"AZURE_TENANT_ID":     AzureTenantID,
+	}
+	log.Default().Printf("success! created azure applicaiton identity resources you can use them with this env: %#v", azCredEnv)
+
 	policies := []Policy{
 		{
 			Scope:              AzureSubscriptionID,
@@ -196,12 +205,4 @@ func main() {
 		}
 	}
 
-	// these environment variables can be set in the pods that need access to cloud services via this service principal
-	// azure has not yet implemented stable workload identity so we are going to use the long lived credential for now
-	azCredEnv := map[string]string{
-		"AZURE_CLIENT_ID":     *sp.AppId,
-		"AZURE_CLIENT_SECRET": *spPass.SecretText,
-		"AZURE_TENANT_ID":     AzureTenantID,
-	}
-	log.Default().Printf("success! created azure applicaiton identity resources you can use them with this env: %#v", azCredEnv)
 }
