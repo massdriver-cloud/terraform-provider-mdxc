@@ -45,10 +45,10 @@ var awsIAMRoleSchema = schema.Schema{
 
 func ApplicationIdentityResource() *schema.Resource {
 	return &schema.Resource{
-		CreateContext: resourceAppIdentityCreate,
-		ReadContext:   resourceAppIdentityRead,
+		CreateContext: resourceApplicationIdentityCreate,
+		ReadContext:   resourceApplicationIdentityRead,
 		//UpdateContext: schema.NoopContext,
-		DeleteContext: resourceAppIdentityDelete,
+		DeleteContext: resourceApplicationIdentityDelete,
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -62,11 +62,11 @@ func ApplicationIdentityResource() *schema.Resource {
 	}
 }
 
-func resourceAppIdentityCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	return meta.(*client.MDXCClient).CreateApplicationIdentity(ctx, d)
+func resourceApplicationIdentityCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	return meta.(client.MDXCClient).CreateApplicationIdentity(ctx, d)
 }
 
-func resourceAppIdentityRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceApplicationIdentityRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	return nil
 }
 
@@ -74,6 +74,6 @@ func resourceAppIdentityRead(ctx context.Context, d *schema.ResourceData, meta i
 // 	return nil
 // }
 
-func resourceAppIdentityDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	return meta.(*client.MDXCClient).DeleteApplicationIdentity(ctx, d)
+func resourceApplicationIdentityDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+	return meta.(client.MDXCClient).DeleteApplicationIdentity(ctx, d)
 }

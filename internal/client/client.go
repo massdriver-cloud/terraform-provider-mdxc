@@ -9,34 +9,33 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-// type MDXCClient interface {
-// 	CreateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
-// 	// ReadAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
-// 	// UpdateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
-// 	DeleteAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
-// }
-
-type CloudConfig interface {
-	NewService() (interface{}, error)
-
-	CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData, cloudClient interface{}) diag.Diagnostics
+type MDXCClient interface {
+	CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
 	// ReadAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
 	// UpdateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
-	DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData, cloudClient interface{}) diag.Diagnostics
+	DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
+
+	CreateApplicationPermission(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
+	// ReadAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
+	// UpdateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
+	DeleteApplicationPermission(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
 }
 
-type MDXCClient struct {
-	CloudConfig CloudConfig
-}
+// type CloudConfig interface {
+// 	CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
+// 	// ReadAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
+// 	// UpdateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics
+// 	DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics
+// }
 
-func MDXCClientFactory(ctx context.Context, config map[string]interface{}, cloud string) (*MDXCClient, error) {
-	mdxcClient := MDXCClient{}
+// type MDXCClient struct {
+// 	CloudConfig CloudConfig
+// }
 
+func MDXCClientFactory(ctx context.Context, config map[string]interface{}, cloud string) (MDXCClient, error) {
 	switch cloud {
 	case "aws":
-		var awsErr error
-		mdxcClient.CloudConfig, awsErr = aws.Initialize(ctx, config)
-		return &mdxcClient, awsErr
+		return aws.Initialize(ctx, config)
 		// case "azure":
 		// 	var azureErr error
 		// 	mdxcClient.CloudConfig, azureErr = azure.Initialize(ctx, config)
