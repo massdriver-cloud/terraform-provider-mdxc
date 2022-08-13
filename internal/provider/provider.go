@@ -115,7 +115,7 @@ func Provider() *schema.Provider {
 			"gcp":   &gcpProviderSchema,
 		},
 		ResourcesMap: map[string]*schema.Resource{
-			"mdxc_app_identity": mdxc.AppIdentityResource(),
+			"mdxc_application_identity": mdxc.ApplicationIdentityResource(),
 		},
 		DataSourcesMap:       map[string]*schema.Resource{},
 		ConfigureContextFunc: providerConfigure,
@@ -154,5 +154,5 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		return mdxcClient, nil
 	}
 
-	return nil, diag.FromErr(errors.New("At least one of 'aws', 'azure' or 'gcp' must be set"))
+	return nil, diag.FromErr(errors.New("at least one of 'aws', 'azure' or 'gcp' must be set"))
 }

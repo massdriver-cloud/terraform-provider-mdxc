@@ -53,7 +53,7 @@ func NewIAMService(ctx context.Context, tokenSource oauth2.TokenSource) (*iam.Se
 // 	}, nil
 // }
 
-func (c *GCPConfig) CreateAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func (c *GCPConfig) CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
 	iamClient, serviceErr := NewIAMService(ctx, c.tokenSource)
 	if serviceErr != nil {
 		return diag.FromErr(serviceErr)
@@ -78,7 +78,7 @@ func (c *GCPConfig) CreateAppIdentity(ctx context.Context, d *schema.ResourceDat
 	return nil
 }
 
-func (c *GCPConfig) DeleteAppIdentity(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func (c *GCPConfig) DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
 	iamClient, serviceErr := NewIAMService(ctx, c.tokenSource)
 	if serviceErr != nil {
 		return diag.FromErr(serviceErr)

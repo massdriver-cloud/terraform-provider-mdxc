@@ -8,9 +8,11 @@ import (
 )
 
 func (c *MDXCClient) CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-	return diag.Diagnostics{}
+	cloudClient, _ := c.CloudConfig.NewService()
+	return c.CloudConfig.CreateApplicationIdentity(ctx, d, cloudClient)
 }
 
 func (c *MDXCClient) DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-	return diag.Diagnostics{}
+	cloudClient, _ := c.CloudConfig.NewService()
+	return c.CloudConfig.DeleteApplicationIdentity(ctx, d, cloudClient)
 }
