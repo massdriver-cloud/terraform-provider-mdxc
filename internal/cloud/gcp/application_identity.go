@@ -58,7 +58,6 @@ type ApplicationIdentityConfig struct {
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
-
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: config.Name,
 		ServiceAccount: &iam.ServiceAccount{
@@ -66,9 +65,8 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		},
 	}
 
-	projectId := config.Project
-
-	serviceAccountOutput, doErr := iamClient.Projects.ServiceAccounts.Create("projects/"+projectId, request).Do()
+	projectResourceName := fmt.Sprintf("projects/%s", config.Project)
+	serviceAccountOutput, doErr := iamClient.Projects.ServiceAccounts.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
@@ -79,19 +77,34 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	_, doErr := iamClient.Projects.ServiceAccounts.Get(serviceAccountResourceName).Do()
+	if doErr != nil {
+		return doErr
+	}
+
 	return nil
 }
 
 func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+	request := &iam.PatchServiceAccountRequest{
+		ServiceAccount: &iam.ServiceAccount{
+			DisplayName: config.Name,
+		},
+	}
+	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	_, doErr := iamClient.Projects.ServiceAccounts.Patch(serviceAccountResourceName, request).Do()
+	if doErr != nil {
+		return doErr
+	}
 	return nil
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
 
-	name := "projects/" + config.Project + "/serviceAccounts/" + config.ID
+	tflog.Debug(ctx, "------------------------------------------------------------------"+serviceAccountResourceName)
 
-	tflog.Debug(ctx, "------------------------------------------------------------------"+name)
-
-	_, doErr := iamClient.Projects.ServiceAccounts.Delete(name).Do()
+	_, doErr := iamClient.Projects.ServiceAccounts.Delete(serviceAccountResourceName).Do()
 	return doErr
 }
