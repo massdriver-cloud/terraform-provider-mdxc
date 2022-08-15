@@ -9,16 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/structure"
 )
 
-type IAMAPI interface {
-	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
-	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
-}
-
-func (c AWSConfig) NewIAMService() IAMAPI {
-	client := iam.NewFromConfig(*c.config)
-	return client
-}
-
 type ApplicationIdentityConfig struct {
 	Name             string
 	AssumeRolePolicy string

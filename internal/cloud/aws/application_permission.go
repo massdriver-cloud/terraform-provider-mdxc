@@ -1,112 +1,54 @@
 package aws
 
-// type IAMAPI interface {
-// 	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
-// 	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
-// }
+import (
+	"context"
+	"fmt"
 
-// // TODO: call this and inject into Create()
-// func (c AWSConfig) NewIAMService() IAMAPI {
-// 	client := iam.NewFromConfig(*c.config)
-// 	return client
-// }
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+)
 
-// // Create an AWS IAM Role as a massdriver.AppIdentity
-// func AppIdentityCreate(ctx context.Context, api IAMCreateRoleAPI, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
-// 	roleInput := iam.CreateRoleInput{
-// 		RoleName: input.Name,
-// 	}
+type ApplicationPermissionConfig struct {
+	ID        string
+	RoleName  string
+	PolicyARN string
+}
 
-// 	roleOutput, err := api.CreateRole(ctx, &roleInput, []func(*iam.Options){})
+func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
 
-// 	appIdentityOutput := massdriver.AppIdentityOutput{
-// 		AwsIamRole: *roleOutput.Role,
-// 	}
+	roleInput := iam.AttachRolePolicyInput{
+		RoleName:  &config.RoleName,
+		PolicyArn: &config.PolicyARN,
+	}
 
-// 	return &appIdentityOutput, err
-// }
+	_, attachErr := client.AttachRolePolicy(ctx, &roleInput)
+	if attachErr != nil {
+		return attachErr
+	}
 
-// type applicationIdentityConfig struct {
-// 	Name             string
-// 	AssumeRolePolicy string
-// }
+	config.ID = fmt.Sprintf("%s/%s", config.RoleName, config.PolicyARN)
 
-// func (c *AWSConfig) CreateApplicationPermission(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-// 	iamClient := c.NewIAMService()
+	return nil
+}
 
-// 	applicationIdentityConfig, extractErr := extractApplicationIdentityConfig(d)
-// 	if extractErr != nil {
-// 		diag.FromErr(extractErr)
-// 	}
+func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+	return nil
+}
 
-// 	output, roleErr := doCreateAWSIAMRole(ctx, applicationIdentityConfig, iamClient)
-// 	if roleErr != nil {
-// 		return diag.FromErr(roleErr)
-// 	}
+func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+	return nil
+}
 
-// 	roleName := *output.Role.RoleName
-// 	d.SetId(roleName)
+func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
 
-// 	return nil
-// }
+	input := iam.DetachRolePolicyInput{
+		RoleName:  &config.RoleName,
+		PolicyArn: &config.PolicyARN,
+	}
 
-// func (c *AWSConfig) DeleteApplicationPermission(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-// 	iamClient := c.NewIAMService()
+	_, deleteErr := client.DetachRolePolicy(ctx, &input)
+	if deleteErr != nil {
+		return deleteErr
+	}
 
-// 	applicationIdentityConfig, extractErr := extractApplicationIdentityConfig(d)
-// 	if extractErr != nil {
-// 		diag.FromErr(extractErr)
-// 	}
-
-// 	_, roleErr := doDeleteAWSIAMRole(ctx, applicationIdentityConfig, iamClient)
-// 	if roleErr != nil {
-// 		return diag.FromErr(roleErr)
-// 	}
-
-// 	return nil
-// }
-
-// func extractApplicationIdentityConfig(d *schema.ResourceData) (*applicationIdentityConfig, error) {
-// 	applicationIdentityConfig := applicationIdentityConfig{}
-
-// 	if v, ok := d.Get("name").(string); ok && v != "" {
-// 		applicationIdentityConfig.Name = v
-// 	}
-
-// 	var awsNestedMap map[string]interface{}
-// 	if awsBlock, ok := d.Get("aws").([]interface{}); ok && len(awsBlock) > 0 && awsBlock[0] != nil {
-// 		awsNestedMap = awsBlock[0].(map[string]interface{})
-// 	} else {
-// 		return nil, errors.New("AWS configuration block not specified")
-// 	}
-
-// 	if v, ok := awsNestedMap["assume_role_policy"].(string); ok && v != "" {
-// 		applicationIdentityConfig.AssumeRolePolicy = v
-// 	}
-
-// 	return &applicationIdentityConfig, nil
-// }
-
-// func doCreateAWSIAMRole(ctx context.Context, config *applicationIdentityConfig, client IAMAPI) (*iam.CreateRoleOutput, error) {
-
-// 	assumeRolePolicy, assumeErr := structure.NormalizeJsonString(config.AssumeRolePolicy)
-// 	if assumeErr != nil {
-// 		return nil, assumeErr
-// 	}
-
-// 	roleInput := iam.CreateRoleInput{
-// 		AssumeRolePolicyDocument: &assumeRolePolicy,
-// 		RoleName:                 &config.Name,
-// 	}
-
-// 	return client.CreateRole(ctx, &roleInput)
-// }
-
-// func doDeleteAWSIAMRole(ctx context.Context, config *applicationIdentityConfig, client IAMAPI) (*iam.DeleteRoleOutput, error) {
-
-// 	input := iam.DeleteRoleInput{
-// 		RoleName: aws.String(config.Name),
-// 	}
-
-// 	return client.DeleteRole(ctx, &input)
-// }
+	return nil
+}

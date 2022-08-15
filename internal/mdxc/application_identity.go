@@ -8,7 +8,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"google.golang.org/api/iam/v1"
 )
 
@@ -23,10 +22,8 @@ type ApplicationIdentityData struct {
 }
 
 func (c *MDXCClient) CreateApplicationIdentity(ctx context.Context, d *ApplicationIdentityData) diag.Diagnostics {
-	tflog.Debug(ctx, "+++++++++++++++++++++++++++++++++++++++ CREATING APPLICATION")
 	switch c.Cloud {
 	case "aws":
-		tflog.Debug(ctx, "+++++++++++++++++++++++++++++++++++++++ CREATING AWS APPLICATION")
 		return runApplicationIdentityFunctionAWS(aws.CreateApplicationIdentity, ctx, d, c.AWSConfig)
 	case "azure":
 		return runApplicationIdentityFunctionAzure(azure.CreateApplicationIdentity, ctx, d, c.AzureConfig)
