@@ -6,25 +6,26 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+type GCPProviderConfig struct {
+	Credentials types.String `tfsdk:"credentials"`
+	Project     types.String `tfsdk:"project"`
+}
+
 type GCPConfig struct {
-	credentials string
-	project     string
+	Provider    *GCPProviderConfig
 	tokenSource oauth2.TokenSource
 }
 
-func Initialize(ctx context.Context, gcpMap map[string]interface{}) (*GCPConfig, error) {
+func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPConfig, error) {
 	gcpConfig := GCPConfig{}
 
-	if credentials, ok := gcpMap["credentials"].(string); ok && credentials != "" {
-		gcpConfig.credentials = credentials
-	}
-	if project, ok := gcpMap["project"].(string); ok && project != "" {
-		gcpConfig.project = project
-	}
+	gcpConfig.Provider = providerConfig
 
-	cfg, err := google.JWTConfigFromJSON([]byte(gcpConfig.credentials), "https://www.googleapis.com/auth/cloud-platform")
+	cfg, err := google.JWTConfigFromJSON([]byte(providerConfig.Credentials.Value), "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return nil, err
 	}

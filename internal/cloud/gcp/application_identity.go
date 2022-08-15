@@ -6,9 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"golang.org/x/oauth2"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
@@ -16,8 +14,8 @@ import (
 // TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
 // Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
 // but haven't seen tf provider client auth yet...
-func NewIAMService(ctx context.Context, tokenSource oauth2.TokenSource) (*iam.Service, error) {
-	service, err := iam.NewService(ctx, option.WithTokenSource(tokenSource))
+func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
+	service, err := iam.NewService(ctx, option.WithTokenSource(c.tokenSource))
 	if err != nil {
 		return nil, fmt.Errorf("iam.NewService: %v", err)
 	}
@@ -53,43 +51,47 @@ func NewIAMService(ctx context.Context, tokenSource oauth2.TokenSource) (*iam.Se
 // 	}, nil
 // }
 
-func (c *GCPConfig) CreateApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-	iamClient, serviceErr := NewIAMService(ctx, c.tokenSource)
-	if serviceErr != nil {
-		return diag.FromErr(serviceErr)
-	}
+type ApplicationIdentityConfig struct {
+	ID      string
+	Project string
+	Name    string
+}
+
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
 
 	request := &iam.CreateServiceAccountRequest{
-		AccountId: d.Get("name").(string),
+		AccountId: config.Name,
 		ServiceAccount: &iam.ServiceAccount{
-			DisplayName: d.Get("name").(string),
+			DisplayName: config.Name,
 		},
 	}
 
-	projectId := c.project
+	projectId := config.Project
 
 	serviceAccountOutput, doErr := iamClient.Projects.ServiceAccounts.Create("projects/"+projectId, request).Do()
 	if doErr != nil {
-		return diag.FromErr(doErr)
+		return doErr
 	}
 
-	d.SetId(serviceAccountOutput.UniqueId)
+	config.ID = serviceAccountOutput.UniqueId
 
 	return nil
 }
 
-func (c *GCPConfig) DeleteApplicationIdentity(ctx context.Context, d *schema.ResourceData) diag.Diagnostics {
-	iamClient, serviceErr := NewIAMService(ctx, c.tokenSource)
-	if serviceErr != nil {
-		return diag.FromErr(serviceErr)
-	}
+func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+	return nil
+}
 
-	name := "projects/" + c.project + "/serviceAccounts/" + d.Id()
+func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+	return nil
+}
+
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+
+	name := "projects/" + config.Project + "/serviceAccounts/" + config.ID
+
+	tflog.Debug(ctx, "------------------------------------------------------------------"+name)
 
 	_, doErr := iamClient.Projects.ServiceAccounts.Delete(name).Do()
-	if doErr != nil {
-		return diag.FromErr(doErr)
-	}
-
-	return nil
+	return doErr
 }

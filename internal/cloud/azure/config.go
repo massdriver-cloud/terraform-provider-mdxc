@@ -4,43 +4,24 @@ import (
 	"context"
 	"log"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AzureConfig struct {
-	subscriptionId string
-	clientId       string
-	clientSecret   string
-	tenantId       string
-	credentials    *azidentity.ClientSecretCredential
+type AzureProviderConfig struct {
+	SubscriptionID types.String `tfsdk:"subscription_id"`
+	ClientID       types.String `tfsdk:"client_id"`
+	ClientSecret   types.String `tfsdk:"client_secret"`
+	TenantID       types.String `tfsdk:"tenant_id"`
 }
 
-func Initialize(ctx context.Context, azureMap map[string]interface{}) (*AzureConfig, error) {
+type AzureConfig struct {
+	provider *AzureProviderConfig
+}
+
+func Initialize(ctx context.Context, providerConfig *AzureProviderConfig) (*AzureConfig, error) {
 	azureConfig := AzureConfig{}
 
-	if subscriptionId, ok := azureMap["subscription_id"].(string); ok && subscriptionId != "" {
-		azureConfig.subscriptionId = subscriptionId
-	}
-	if clientId, ok := azureMap["client_id"].(string); ok && clientId != "" {
-		azureConfig.clientId = clientId
-	}
-	if clientSecret, ok := azureMap["client_secret"].(string); ok && clientSecret != "" {
-		azureConfig.clientSecret = clientSecret
-	}
-	if tenantId, ok := azureMap["tenant_id"].(string); ok && tenantId != "" {
-		azureConfig.tenantId = tenantId
-	}
-
-	var clientErr error
-	azureConfig.credentials, clientErr = azidentity.NewClientSecretCredential(
-		azureConfig.tenantId,
-		azureConfig.clientId,
-		azureConfig.clientSecret,
-		nil,
-	)
-	if clientErr != nil {
-		return nil, clientErr
-	}
+	azureConfig.provider = providerConfig
 
 	log.Printf("[debug] Azure Config Created")
 	return &azureConfig, nil
