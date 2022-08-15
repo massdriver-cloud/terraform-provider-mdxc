@@ -1,10 +1,13 @@
 package main
 
 import (
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
+	"context"
+	"flag"
+	"log"
 
-	"terraform-provider-mdxc/mdxc"
+	"terraform-provider-mdxc/internal/provider"
+
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 // Run "go generate" to format example terraform files and generate the docs for the registry/website
@@ -17,10 +20,30 @@ import (
 // can be customized.
 //go:generate go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs
 
+var (
+	// these will be set by the goreleaser configuration
+	// to appropriate values for the compiled binary
+	version string = "dev"
+
+	// goreleaser can also pass the specific commit if you want
+	// commit  string = ""
+)
+
 func main() {
-	plugin.Serve(&plugin.ServeOpts{
-		ProviderFunc: func() *schema.Provider {
-			return mdxc.Provider()
-		},
-	})
+	var debug bool
+
+	flag.BoolVar(&debug, "debug", false, "set to true to run the provider with support for debuggers like delve")
+	flag.Parse()
+
+	opts := providerserver.ServeOpts{
+		// TODO: Update this string with the published name of your provider.
+		Address: "registry.terraform.io/massdriver-cloud/mdxc",
+		Debug:   debug,
+	}
+
+	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 }
