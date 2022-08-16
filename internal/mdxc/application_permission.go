@@ -7,7 +7,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"google.golang.org/api/cloudresourcemanager/v1"
 )
 
 type AWSApplicationPermissionData struct {
@@ -135,7 +134,7 @@ func runApplicationPermissionFunctionAWS(function applicationPermissionFunctionA
 // }
 
 // // -------------- GCP --------------
-type applicationPermissionFunctionGCP func(context.Context, *gcp.ApplicationPermissionConfig, *cloudresourcemanager.Service) error
+type applicationPermissionFunctionGCP func(context.Context, *gcp.ApplicationPermissionConfig, gcp.GCPResourceManagerIface) error
 
 func convertApplicationPermissionConfigTerraformToGCP(d *ApplicationPermissionData, a *gcp.ApplicationPermissionConfig, c *gcp.GCPConfig) {
 	a.ID = d.Id.Value

@@ -21,16 +21,21 @@ type ApplicationPermissionConfig struct {
 	Member           string
 }
 
-func (c *GCPConfig) NewResourceManagerService(ctx context.Context) (*cloudresourcemanager.Service, error) {
+type GCPResourceManagerIface interface {
+	GetIamPolicy(project string, getiampolicyrequest *cloudresourcemanager.GetIamPolicyRequest) *cloudresourcemanager.ProjectsGetIamPolicyCall
+	SetIamPolicy(project string, setiampolicyrequest *cloudresourcemanager.SetIamPolicyRequest) *cloudresourcemanager.ProjectsSetIamPolicyCall
+}
+
+func (c *GCPConfig) NewResourceManagerService(ctx context.Context) (GCPResourceManagerIface, error) {
 	service, err := cloudresourcemanager.NewService(ctx, option.WithTokenSource(c.tokenSource))
 	if err != nil {
 		return nil, fmt.Errorf("cloudresourcemanager.NewService: %v", err)
 	}
 
-	return service, nil
+	return service.Projects, nil
 }
 
-func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client *cloudresourcemanager.Service) error {
+func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
 	projectPolicy, err := getProjectIamPolicy(client, config.Project)
 	if err != nil {
 		return err
@@ -47,15 +52,15 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 	return nil
 }
 
-func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client *cloudresourcemanager.Service) error {
+func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
 	return nil
 }
 
-func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client *cloudresourcemanager.Service) error {
+func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
 	return nil
 }
 
-func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client *cloudresourcemanager.Service) error {
+func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
 	projectPolicy, err := getProjectIamPolicy(client, config.Project)
 	if err != nil {
 		return err
@@ -72,8 +77,8 @@ func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermiss
 	return nil
 }
 
-func getProjectIamPolicy(service *cloudresourcemanager.Service, projectId string) (*cloudresourcemanager.Policy, error) {
-	getCall := service.Projects.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{})
+func getProjectIamPolicy(service GCPResourceManagerIface, projectId string) (*cloudresourcemanager.Policy, error) {
+	getCall := service.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{})
 	policy, errDo := getCall.Do()
 	if errDo != nil {
 		return nil, errDo
@@ -82,8 +87,8 @@ func getProjectIamPolicy(service *cloudresourcemanager.Service, projectId string
 	return policy, nil
 }
 
-func saveProjectIamPolicy(service *cloudresourcemanager.Service, projectId string, policy *cloudresourcemanager.Policy) error {
-	saveCall := service.Projects.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
+func saveProjectIamPolicy(service GCPResourceManagerIface, projectId string, policy *cloudresourcemanager.Policy) error {
+	saveCall := service.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
 		Policy: policy,
 	})
 	policy, errDo := saveCall.Do()
