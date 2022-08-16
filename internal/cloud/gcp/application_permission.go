@@ -3,10 +3,13 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
@@ -45,18 +48,45 @@ func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenS
 	return service.Projects, nil
 }
 
+func isConflictError(err error) bool {
+	if e, ok := err.(*googleapi.Error); ok && (e.Code == 409 || e.Code == 412) {
+		return true
+	} else if !ok && errwrap.ContainsType(err, &googleapi.Error{}) {
+		e := errwrap.GetType(err, &googleapi.Error{}).(*googleapi.Error)
+		if e.Code == 409 || e.Code == 412 {
+			return true
+		}
+	}
+	return false
+}
+
 func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
 	response := GCPIAMResponse{}
-	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	if err != nil {
-		return response, err
-	}
 
-	tflog.Debug(ctx, "adding role "+config.Role)
-	AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
+	backoff := time.Second
 
-	if errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy); errSave != nil {
-		return response, errSave
+	for {
+		projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+		if err != nil {
+			return response, err
+		}
+
+		AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
+
+		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+		if errSave == nil {
+			// TODO: fetch again I think?
+			// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
+			break
+		}
+		if isConflictError(errSave) {
+			time.Sleep(backoff)
+			backoff = backoff * 2
+			if backoff > 30*time.Second {
+				return response, errwrap.Wrapf(fmt.Sprintf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", "create permission"), err)
+			}
+			continue
+		}
 	}
 
 	return response, nil
@@ -101,6 +131,11 @@ func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, p
 	return policy, nil
 }
 
+// │ Error: googleapi: Error 409: There were concurrent policy changes. Please retry the whole read-modify-write with exponential backoff., aborted
+// │
+// │   with mdxc_application_permission.main["viewer"],
+// │   on main.tf line 49, in resource "mdxc_application_permission" "main":
+// │   49: resource "mdxc_application_permission" "main" {
 func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, projectId string, policy *cloudresourcemanager.Policy) error {
 	tflog.Debug(ctx, "saveProjectIamPolicy "+projectId)
 	saveCall := service.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
