@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-type IAMAPI interface {
+type IAMClient interface {
 	CreateRole(ctx context.Context, params *iam.CreateRoleInput, optFns ...func(*iam.Options)) (*iam.CreateRoleOutput, error)
 	DeleteRole(ctx context.Context, params *iam.DeleteRoleInput, optFns ...func(*iam.Options)) (*iam.DeleteRoleOutput, error)
 
@@ -21,7 +21,7 @@ type IAMAPI interface {
 	DetachRolePolicy(ctx context.Context, params *iam.DetachRolePolicyInput, optFns ...func(*iam.Options)) (*iam.DetachRolePolicyOutput, error)
 }
 
-func (c AWSConfig) NewIAMService() IAMAPI {
+func (c AWSConfig) NewIAMService() IAMClient {
 	client := iam.NewFromConfig(*c.config)
 	return client
 }

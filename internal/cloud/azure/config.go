@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/manicminer/hamilton/auth"
+	"github.com/manicminer/hamilton/environments"
 )
 
 type AzureProviderConfig struct {
@@ -15,13 +17,24 @@ type AzureProviderConfig struct {
 }
 
 type AzureConfig struct {
-	provider *AzureProviderConfig
+	provider   *AzureProviderConfig
+	authConfig *auth.Config
 }
 
 func Initialize(ctx context.Context, providerConfig *AzureProviderConfig) (*AzureConfig, error) {
 	azureConfig := AzureConfig{}
 
 	azureConfig.provider = providerConfig
+
+	authConfig := auth.Config{
+		Environment:            environments.Global,
+		TenantID:               providerConfig.TenantID.Value,
+		ClientID:               providerConfig.ClientID.Value,
+		ClientSecret:           providerConfig.ClientSecret.Value,
+		EnableClientSecretAuth: true,
+	}
+
+	azureConfig.authConfig = &authConfig
 
 	log.Printf("[debug] Azure Config Created")
 	return &azureConfig, nil
