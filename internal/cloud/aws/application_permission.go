@@ -13,7 +13,7 @@ type ApplicationPermissionConfig struct {
 	PolicyARN string
 }
 
-func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
 
 	roleInput := iam.AttachRolePolicyInput{
 		RoleName:  &config.RoleName,
@@ -30,15 +30,15 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 	return nil
 }
 
-func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
 	return nil
 }
 
-func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
 	return nil
 }
 
-func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMAPI) error {
+func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
 
 	input := iam.DetachRolePolicyInput{
 		RoleName:  &config.RoleName,

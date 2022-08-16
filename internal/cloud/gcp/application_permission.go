@@ -20,8 +20,11 @@ type ApplicationPermissionConfig struct {
 	ID               string
 	ServiceAccountID string
 	Project          string
-	Roles            []Role
+	Role             string
+	Condition        string
 	Member           string
+	// TODO: remove
+	// Roles []Role
 }
 
 type GCPIAMResponse struct {
@@ -44,19 +47,15 @@ func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenS
 
 func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
 	response := GCPIAMResponse{}
-	project := "md-wbeebe-0808-example-apps"
-	tflog.Debug(ctx, "CreateApplicationPermission"+project)
-	projectPolicy, err := getProjectIamPolicy(ctx, client, project)
+	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
 	if err != nil {
 		return response, err
 	}
 
-	for _, role := range config.Roles {
-		tflog.Debug(ctx, "adding role "+role.Role)
-		AddToPolicy(ctx, role.Role, config.Member, projectPolicy)
-	}
+	tflog.Debug(ctx, "adding role "+config.Role)
+	AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
 
-	if errSave := saveProjectIamPolicy(ctx, client, project, projectPolicy); errSave != nil {
+	if errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy); errSave != nil {
 		return response, errSave
 	}
 
@@ -80,9 +79,7 @@ func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermiss
 		return response, err
 	}
 
-	for _, role := range config.Roles {
-		RemoveFromPolicy(role.Role, config.Member, projectPolicy)
-	}
+	RemoveFromPolicy(config.Role, config.Member, projectPolicy)
 
 	if errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy); errSave != nil {
 		return response, errSave

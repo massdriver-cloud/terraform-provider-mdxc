@@ -20,14 +20,63 @@ var _ resource.ResourceWithImportState = ApplicationPermission{}
 
 type ApplicationPermissionType struct{}
 
-var awsApplicationPermissionSchema = tfsdk.Attribute{
+var awsApplicationPermissionInputs = tfsdk.Attribute{
 	Optional:    true,
 	Description: "AWS IAM Role Configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
 		"policy_arn": {
 			Type:        types.StringType,
 			Required:    true,
-			Description: "AWS IAM Policy ARN to associate with the application Permission (AWS IAM role)",
+			Description: "AWS IAM policy ARN to associate with the application identity",
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
+		},
+	}),
+}
+
+var azureApplicationPermissionInputs = tfsdk.Attribute{
+	Optional:    true,
+	Description: "Azure IAM Role Configuration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"role_name": {
+			Type:        types.StringType,
+			Required:    true,
+			Description: "The Azure built-in IAM role to bind to the application identity",
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
+		},
+		"scope": {
+			Type:        types.StringType,
+			Required:    true,
+			Description: "The scope at which the Role Assignment applies to",
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
+		},
+	}),
+}
+
+var gcpApplicationPermissionInputs = tfsdk.Attribute{
+	Optional:    true,
+	Description: "Azure IAM Role Configuration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"role": {
+			Type:        types.StringType,
+			Required:    true,
+			Description: "The GCP role to bind to the application identity",
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
+		},
+		"condition": {
+			Type:        types.StringType,
+			Required:    true,
+			Description: "An IAM Condition for a given role binding",
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
 		},
 	}),
 }
@@ -50,7 +99,9 @@ func (t ApplicationPermissionType) GetSchema(ctx context.Context) (tfsdk.Schema,
 				Description: "The ID of the Application Permission resource",
 				Required:    true,
 			},
-			"aws": awsApplicationPermissionSchema,
+			"aws_configuration":   awsApplicationPermissionInputs,
+			"azure_configuration": azureApplicationPermissionInputs,
+			"gcp_configuration":   gcpApplicationPermissionInputs,
 		},
 	}, nil
 }

@@ -12,48 +12,6 @@ import (
 	"google.golang.org/api/option"
 )
 
-type GCPIamIface interface {
-	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
-	Get(name string) *iam.ProjectsServiceAccountsGetCall
-	Patch(name string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
-	Delete(name string) *iam.ProjectsServiceAccountsDeleteCall
-}
-
-// TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
-// Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
-// but haven't seen tf provider client auth yet...
-// func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
-// 	service, err := iam.NewService(ctx, option.WithTokenSource(c.tokenSource))
-// 	if err != nil {
-// 		return nil, fmt.Errorf("iam.NewService: %v", err)
-// 	}
-
-// 	return service, nil
-// }
-
-func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
-	service, err := iam.NewService(ctx, option.WithTokenSource(tokenSource))
-	if err != nil {
-		return nil, fmt.Errorf("iam.NewService: %v", err)
-	}
-
-	return service.Projects.ServiceAccounts, nil
-}
-
-// func CreateServiceAccount(ctx context.Context, serviceAcctApi *iam.ProjectsServiceAccountsService, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
-// 	request := &iam.CreateServiceAccountRequest{
-// 		AccountId: *input.Name,
-// 		ServiceAccount: &iam.ServiceAccount{
-// 			DisplayName: *input.Name,
-// 		},
-// 	}
-
-// 	//TODO: projectId must come from tfland
-// 	projectId := "foo"
-
-// 	return serviceAcctApi.Create("projects/"+projectId, request).Do()
-// }
-
 // // Create a massdriver AppIdentity in GCP.
 // func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
 // 	// We will need to apply a number of operations for GCP. We should use a backoff library and
@@ -63,15 +21,27 @@ func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (G
 // 	// TODO func CreateProjectIAMBinding()
 // 	// TODO func CreateServiceAccountIAMMember()
 
-// 	return &massdriver.AppIdentityOutput{
-// 		GcpServiceAccount: iam.ServiceAccount{Email: svcAcct.Email},
-// 	}, nil
-// }
-
 type ApplicationIdentityConfig struct {
 	ID      string
 	Project string
 	Name    string
+	Email   string
+}
+
+type GCPIamIface interface {
+	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
+	Get(name string) *iam.ProjectsServiceAccountsGetCall
+	Patch(name string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
+	Delete(name string) *iam.ProjectsServiceAccountsDeleteCall
+}
+
+func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
+	service, err := iam.NewService(ctx, option.WithTokenSource(tokenSource))
+	if err != nil {
+		return nil, fmt.Errorf("iam.NewService: %v", err)
+	}
+
+	return service.Projects.ServiceAccounts, nil
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
@@ -83,22 +53,26 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	projectResourceName := fmt.Sprintf("projects/%s", config.Project)
-	serviceAccountOutput, doErr := iamClient.Create(projectResourceName, request).Do()
+	serviceAccount, doErr := iamClient.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
 
-	config.ID = serviceAccountOutput.UniqueId
+	config.ID = serviceAccount.UniqueId
+	config.Email = serviceAccount.Email
 
 	return nil
 }
 
 func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	_, doErr := iamClient.Get(serviceAccountResourceName).Do()
+	serviceAccount, doErr := iamClient.Get(serviceAccountResourceName).Do()
 	if doErr != nil {
 		return doErr
 	}
+
+	config.ID = serviceAccount.UniqueId
+	config.Email = serviceAccount.Email
 
 	return nil
 }
