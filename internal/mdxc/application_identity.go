@@ -2,13 +2,13 @@ package mdxc
 
 import (
 	"context"
+	"log"
 	"terraform-provider-mdxc/internal/cloud/aws"
 	"terraform-provider-mdxc/internal/cloud/azure"
 	"terraform-provider-mdxc/internal/cloud/gcp"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"google.golang.org/api/iam/v1"
 )
 
 type AWSApplicationIdentityData struct {
@@ -135,7 +135,7 @@ func runApplicationIdentityFunctionAzure(function applicationIdentityFunctionAzu
 }
 
 // -------------- GCP --------------
-type applicationIdentityFunctionGCP func(context.Context, *gcp.ApplicationIdentityConfig, *iam.Service) error
+type applicationIdentityFunctionGCP func(context.Context, *gcp.ApplicationIdentityConfig, gcp.GCPIamIface) error
 
 func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, a *gcp.ApplicationIdentityConfig, c *gcp.GCPConfig) {
 	a.Name = d.Name.Value
@@ -150,7 +150,8 @@ func convertApplicationIdentityConfigGCPToTerraform(a *gcp.ApplicationIdentityCo
 
 func runApplicationIdentityFunctionGCP(function applicationIdentityFunctionGCP, ctx context.Context, d *ApplicationIdentityData, config *gcp.GCPConfig) diag.Diagnostics {
 	var diags diag.Diagnostics
-	iamClient, serviceErr := config.NewIAMService(ctx)
+	log.Printf("[debug] NewIAMService")
+	iamClient, serviceErr := config.NewIAMService(ctx, config.TokenSource)
 	if serviceErr != nil {
 		diags.Append(
 			diag.NewErrorDiagnostic(serviceErr.Error(), ""),

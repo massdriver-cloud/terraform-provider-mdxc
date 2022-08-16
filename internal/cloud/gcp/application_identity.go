@@ -7,20 +7,37 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
 
+type GCPIamIface interface {
+	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
+	Get(name string) *iam.ProjectsServiceAccountsGetCall
+	Patch(name string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
+	Delete(name string) *iam.ProjectsServiceAccountsDeleteCall
+}
+
 // TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
 // Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
 // but haven't seen tf provider client auth yet...
-func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
-	service, err := iam.NewService(ctx, option.WithTokenSource(c.tokenSource))
+// func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
+// 	service, err := iam.NewService(ctx, option.WithTokenSource(c.tokenSource))
+// 	if err != nil {
+// 		return nil, fmt.Errorf("iam.NewService: %v", err)
+// 	}
+
+// 	return service, nil
+// }
+
+func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
+	service, err := iam.NewService(ctx, option.WithTokenSource(tokenSource))
 	if err != nil {
 		return nil, fmt.Errorf("iam.NewService: %v", err)
 	}
 
-	return service, nil
+	return service.Projects.ServiceAccounts, nil
 }
 
 // func CreateServiceAccount(ctx context.Context, serviceAcctApi *iam.ProjectsServiceAccountsService, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
@@ -57,7 +74,7 @@ type ApplicationIdentityConfig struct {
 	Name    string
 }
 
-func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: config.Name,
 		ServiceAccount: &iam.ServiceAccount{
@@ -66,7 +83,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	projectResourceName := fmt.Sprintf("projects/%s", config.Project)
-	serviceAccountOutput, doErr := iamClient.Projects.ServiceAccounts.Create(projectResourceName, request).Do()
+	serviceAccountOutput, doErr := iamClient.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
@@ -76,9 +93,9 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	return nil
 }
 
-func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	_, doErr := iamClient.Projects.ServiceAccounts.Get(serviceAccountResourceName).Do()
+	_, doErr := iamClient.Get(serviceAccountResourceName).Do()
 	if doErr != nil {
 		return doErr
 	}
@@ -86,25 +103,25 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 	return nil
 }
 
-func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	request := &iam.PatchServiceAccountRequest{
 		ServiceAccount: &iam.ServiceAccount{
 			DisplayName: config.Name,
 		},
 	}
 	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	_, doErr := iamClient.Projects.ServiceAccounts.Patch(serviceAccountResourceName, request).Do()
+	_, doErr := iamClient.Patch(serviceAccountResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
 	return nil
 }
 
-func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
 
 	tflog.Debug(ctx, "------------------------------------------------------------------"+serviceAccountResourceName)
 
-	_, doErr := iamClient.Projects.ServiceAccounts.Delete(serviceAccountResourceName).Do()
+	_, doErr := iamClient.Delete(serviceAccountResourceName).Do()
 	return doErr
 }

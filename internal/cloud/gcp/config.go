@@ -16,21 +16,28 @@ type GCPProviderConfig struct {
 }
 
 type GCPConfig struct {
-	Provider    *GCPProviderConfig
-	tokenSource oauth2.TokenSource
+	Provider                  *GCPProviderConfig
+	TokenSource               oauth2.TokenSource
+	NewIAMService             func(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error)
+	NewResourceManagerService func(ctx context.Context, tokenSource oauth2.TokenSource) (GCPResourceManagerIface, error)
 }
 
 func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPConfig, error) {
-	gcpConfig := GCPConfig{}
+	gcpConfig := GCPConfig{
+		Provider:                  providerConfig,
+		NewIAMService:             gcpIAMClientFactory,
+		NewResourceManagerService: resourceManagerClientFactory,
+	}
 
-	gcpConfig.Provider = providerConfig
-
+	log.Printf("[debug] Creating GCP TokenSource")
 	cfg, err := google.JWTConfigFromJSON([]byte(providerConfig.Credentials.Value), "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return nil, err
 	}
 
-	gcpConfig.tokenSource = cfg.TokenSource(ctx)
+	gcpConfig.TokenSource = cfg.TokenSource(ctx)
+	// gcpConfig.NewIAMService = gcpIAMClientFactory(ctx, gcpConfig.TokenSource)
+
 	log.Printf("[debug] GCP Config Created")
 	return &gcpConfig, nil
 }

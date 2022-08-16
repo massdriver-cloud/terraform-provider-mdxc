@@ -3,7 +3,9 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"log"
 
+	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
 )
@@ -21,13 +23,23 @@ type ApplicationPermissionConfig struct {
 	Member           string
 }
 
+type GCPIAMResponse struct {
+	Email string
+}
+
 type GCPResourceManagerIface interface {
 	GetIamPolicy(project string, getiampolicyrequest *cloudresourcemanager.GetIamPolicyRequest) *cloudresourcemanager.ProjectsGetIamPolicyCall
 	SetIamPolicy(project string, setiampolicyrequest *cloudresourcemanager.SetIamPolicyRequest) *cloudresourcemanager.ProjectsSetIamPolicyCall
 }
 
-func (c *GCPConfig) NewResourceManagerService(ctx context.Context) (GCPResourceManagerIface, error) {
-	service, err := cloudresourcemanager.NewService(ctx, option.WithTokenSource(c.tokenSource))
+// func NewClient() *GCPConfig {
+// 	return &GCPConfig{
+// 		NewResourceManagerService: resourceManagerClientFactory,
+// 	}
+// }
+
+func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPResourceManagerIface, error) {
+	service, err := cloudresourcemanager.NewService(ctx, option.WithTokenSource(tokenSource))
 	if err != nil {
 		return nil, fmt.Errorf("cloudresourcemanager.NewService: %v", err)
 	}
@@ -35,35 +47,41 @@ func (c *GCPConfig) NewResourceManagerService(ctx context.Context) (GCPResourceM
 	return service.Projects, nil
 }
 
-func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	projectPolicy, err := getProjectIamPolicy(client, config.Project)
+func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
+	response := GCPIAMResponse{}
+	project := "md-wbeebe-0808-example-apps"
+	projectPolicy, err := getProjectIamPolicy(client, project)
 	if err != nil {
-		return err
+		return response, err
 	}
 
 	for _, role := range config.Roles {
+		log.Printf("[perms] adding role %s", role.Role)
 		AddToPolicy(role.Role, config.Member, projectPolicy)
 	}
 
-	if errSave := saveProjectIamPolicy(client, config.Project, projectPolicy); errSave != nil {
-		return errSave
+	if errSave := saveProjectIamPolicy(client, project, projectPolicy); errSave != nil {
+		return response, errSave
 	}
 
-	return nil
+	return response, nil
 }
 
-func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	return nil
+func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
+	response := GCPIAMResponse{}
+	return response, nil
 }
 
-func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	return nil
+func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
+	response := GCPIAMResponse{}
+	return response, nil
 }
 
-func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
+	response := GCPIAMResponse{}
 	projectPolicy, err := getProjectIamPolicy(client, config.Project)
 	if err != nil {
-		return err
+		return response, err
 	}
 
 	for _, role := range config.Roles {
@@ -71,24 +89,28 @@ func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermiss
 	}
 
 	if errSave := saveProjectIamPolicy(client, config.Project, projectPolicy); errSave != nil {
-		return errSave
+		return response, errSave
 	}
 
-	return nil
+	return response, nil
 }
 
 func getProjectIamPolicy(service GCPResourceManagerIface, projectId string) (*cloudresourcemanager.Policy, error) {
-	getCall := service.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{})
+	id := "projects/" + projectId
+	getCall := service.GetIamPolicy(id, &cloudresourcemanager.GetIamPolicyRequest{})
 	policy, errDo := getCall.Do()
 	if errDo != nil {
 		return nil, errDo
 	}
+	log.Printf("[debug] got iam policy")
 
 	return policy, nil
 }
 
 func saveProjectIamPolicy(service GCPResourceManagerIface, projectId string, policy *cloudresourcemanager.Policy) error {
-	saveCall := service.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
+	id := "projects/" + projectId
+
+	saveCall := service.SetIamPolicy(id, &cloudresourcemanager.SetIamPolicyRequest{
 		Policy: policy,
 	})
 	policy, errDo := saveCall.Do()
@@ -103,12 +125,14 @@ func AddToPolicy(role string, member string, policy *cloudresourcemanager.Policy
 	addedToExisting := false
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
+			log.Printf("[debug] adding to existing")
 			// TODO: dedupe members
 			binding.Members = append(binding.Members, fmt.Sprintf("serviceAccount:%s", member))
 			addedToExisting = true
 		}
 	}
 	if !addedToExisting {
+		log.Printf("[debug] adding new policy")
 		policy.Bindings = append(policy.Bindings, &cloudresourcemanager.Binding{
 			Role: role,
 			Members: []string{
@@ -123,14 +147,18 @@ func AddToPolicy(role string, member string, policy *cloudresourcemanager.Policy
 func RemoveFromPolicy(role string, member string, policy *cloudresourcemanager.Policy) error {
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
-			filteredMembers := []string{}
+			membersToKeep := []string{}
 			for _, existingMember := range binding.Members {
 				if existingMember != fmt.Sprintf("serviceAccount:%s", member) {
-					filteredMembers = append(filteredMembers, existingMember)
+					membersToKeep = append(membersToKeep, existingMember)
 				}
 			}
-			binding.Members = filteredMembers
+			binding.Members = membersToKeep
 		}
 	}
 	return nil
+}
+
+func addWorkloadIdentityRole() {
+
 }
