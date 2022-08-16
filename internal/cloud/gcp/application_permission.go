@@ -9,15 +9,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
-
-type Role struct {
-	Role      string
-	Condition string
-}
 
 type ApplicationPermissionConfig struct {
 	ID               string
@@ -26,8 +20,6 @@ type ApplicationPermissionConfig struct {
 	Role             string
 	Condition        string
 	Member           string
-	// TODO: remove
-	// Roles []Role
 }
 
 type GCPIAMResponse struct {
@@ -48,45 +40,11 @@ func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenS
 	return service.Projects, nil
 }
 
-func isConflictError(err error) bool {
-	if e, ok := err.(*googleapi.Error); ok && (e.Code == 409 || e.Code == 412) {
-		return true
-	} else if !ok && errwrap.ContainsType(err, &googleapi.Error{}) {
-		e := errwrap.GetType(err, &googleapi.Error{}).(*googleapi.Error)
-		if e.Code == 409 || e.Code == 412 {
-			return true
-		}
-	}
-	return false
-}
-
 func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
 	response := GCPIAMResponse{}
 
-	backoff := time.Second
-
-	for {
-		projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-		if err != nil {
-			return response, err
-		}
-
-		AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
-
-		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
-		if errSave == nil {
-			// TODO: fetch again I think?
-			// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
-			break
-		}
-		if isConflictError(errSave) {
-			time.Sleep(backoff)
-			backoff = backoff * 2
-			if backoff > 30*time.Second {
-				return response, errwrap.Wrapf(fmt.Sprintf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", "create permission"), err)
-			}
-			continue
-		}
+	if errDo := readModifyWriteWithBackoff(ctx, config, client, AddToPolicy); errDo != nil {
+		return response, errDo
 	}
 
 	return response, nil
@@ -104,18 +62,42 @@ func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 
 func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
 	response := GCPIAMResponse{}
-	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	if err != nil {
-		return response, err
-	}
 
-	RemoveFromPolicy(config.Role, config.Member, projectPolicy)
-
-	if errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy); errSave != nil {
-		return response, errSave
+	if errDo := readModifyWriteWithBackoff(ctx, config, client, RemoveFromPolicy); errDo != nil {
+		return response, errDo
 	}
 
 	return response, nil
+}
+
+func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface, modifyFunc func(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error) error {
+	backoff := time.Second
+
+	for {
+		projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+		if err != nil {
+			return err
+		}
+
+		AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
+
+		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+		if errSave == nil {
+			// TODO: fetch again I think?
+			// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
+			break
+		}
+		if isConflictError(errSave) {
+			time.Sleep(backoff)
+			backoff = backoff * 2
+			if backoff > 30*time.Second {
+				return errwrap.Wrapf(fmt.Sprintf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", "create permission"), err)
+			}
+			continue
+		}
+	}
+
+	return nil
 }
 
 // https://cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/create
@@ -131,11 +113,6 @@ func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, p
 	return policy, nil
 }
 
-// │ Error: googleapi: Error 409: There were concurrent policy changes. Please retry the whole read-modify-write with exponential backoff., aborted
-// │
-// │   with mdxc_application_permission.main["viewer"],
-// │   on main.tf line 49, in resource "mdxc_application_permission" "main":
-// │   49: resource "mdxc_application_permission" "main" {
 func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, projectId string, policy *cloudresourcemanager.Policy) error {
 	tflog.Debug(ctx, "saveProjectIamPolicy "+projectId)
 	saveCall := service.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
@@ -172,7 +149,7 @@ func AddToPolicy(ctx context.Context, role string, member string, policy *cloudr
 }
 
 // good thing to test
-func RemoveFromPolicy(role string, member string, policy *cloudresourcemanager.Policy) error {
+func RemoveFromPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
 			membersToKeep := []string{}
@@ -188,17 +165,16 @@ func RemoveFromPolicy(role string, member string, policy *cloudresourcemanager.P
 }
 
 func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
-	projectId := ""
-	namespace := "default"
-	namePrefix := "example-apps"
-	k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", projectId, namespace, namePrefix)
+	// namespace := "default"
+	// namePrefix := "example-apps"
+	// k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, namespace, namePrefix)
 	response := GCPIAMResponse{}
-	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	if err != nil {
-		return response, err
-	}
-	AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
-	saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+	// if err != nil {
+	// 	return response, err
+	// }
+	// AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
+	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
 
 	return response, nil
 }
