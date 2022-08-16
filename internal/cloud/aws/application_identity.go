@@ -11,10 +11,11 @@ import (
 
 type ApplicationIdentityConfig struct {
 	Name             string
+	IAMRoleARN       string
 	AssumeRolePolicy string
 }
 
-func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMAPI) error {
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMClient) error {
 	assumeRolePolicy, assumeErr := structure.NormalizeJsonString(config.AssumeRolePolicy)
 	if assumeErr != nil {
 		return assumeErr
@@ -31,19 +32,20 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	config.Name = *output.Role.RoleName
+	config.IAMRoleARN = *output.Role.Arn
 
 	return nil
 }
 
-func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMAPI) error {
+func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMClient) error {
 	return nil
 }
 
-func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMAPI) error {
+func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMClient) error {
 	return nil
 }
 
-func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMAPI) error {
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client IAMClient) error {
 
 	input := iam.DeleteRoleInput{
 		RoleName: aws.String(config.Name),

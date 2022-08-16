@@ -52,9 +52,10 @@ func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
 // }
 
 type ApplicationIdentityConfig struct {
-	ID      string
-	Project string
-	Name    string
+	ID                  string
+	Project             string
+	Name                string
+	ServiceAccountEmail string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
@@ -73,7 +74,8 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		return doErr
 	}
 
-	config.ID = serviceAccountOutput.UniqueId
+	config.ID = serviceAccountOutput.Email
+	config.ServiceAccountEmail = serviceAccountOutput.Email
 
 	return nil
 }

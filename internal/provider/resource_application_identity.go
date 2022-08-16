@@ -20,19 +20,77 @@ var _ resource.ResourceWithImportState = ApplicationIdentity{}
 
 type ApplicationIdentityType struct{}
 
-var awsApplicationIdentitySchema = tfsdk.Attribute{
+var awsApplicationIdentityInputs = tfsdk.Attribute{
 	Optional:    true,
-	Description: "AWS IAM Role Configuration",
+	Description: "AWS IAM role configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
 		"assume_role_policy": {
+			Type:        types.StringType,
+			Description: "The AWS IAM role assume role policy. Required if provisioning into AWS",
+			Required:    true,
+		},
+	}),
+}
+
+var azureApplicationIdentityInputs = tfsdk.Attribute{
+	Optional:    true,
+	Description: "Azure application and service principal configuration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"placeholder": {
 			Type:     types.StringType,
-			Required: true,
-			// ValidateFunc:     validation.StringIsJSON,
-			// DiffSuppressFunc: verify.SuppressEquivalentPolicyDiffs,
-			// StateFunc: func(v interface{}) string {
-			// 	json, _ := structure.NormalizeJsonString(v)
-			// 	return json
-			// },
+			Optional: true,
+		},
+	}),
+}
+
+var gcpApplicationIdentityInputs = tfsdk.Attribute{
+	Optional:    true,
+	Description: "GCP service account onfiguration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"placeholder": {
+			Type:     types.StringType,
+			Optional: true,
+		},
+	}),
+}
+
+var awsApplicationIdentityOutputs = tfsdk.Attribute{
+	Computed:    true,
+	Description: "AWS IAM role configuration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"iam_role_arn": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+	}),
+}
+
+var azureApplicationIdentityOutputs = tfsdk.Attribute{
+	Computed:    true,
+	Description: "Azure application and service principal configuration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"application_id": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+		"client_id": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+		"client_secret": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+	}),
+}
+
+var gcpApplicationIdentityOutputs = tfsdk.Attribute{
+	Computed:    true,
+	Description: "GCP service account onfiguration",
+	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+		"service_account_email": {
+			Type:     types.StringType,
+			Computed: true,
 		},
 	}),
 }
@@ -55,7 +113,17 @@ func (t ApplicationIdentityType) GetSchema(ctx context.Context) (tfsdk.Schema, d
 				Description: "The name of the IAM entity in the respective cloud (AWS IAM Role, GCP Service Account, Azure Application)",
 				Required:    true,
 			},
-			"aws": awsApplicationIdentitySchema,
+			"cloud": {
+				Type:                types.StringType,
+				MarkdownDescription: "The cloud the application identity was provisioned into (value will be `aws`, `azure` or `gcp`)",
+				Computed:            true,
+			},
+			"aws_configuration":          awsApplicationIdentityInputs,
+			"azure_configuration":        azureApplicationIdentityInputs,
+			"gcp_configuration":          gcpApplicationIdentityInputs,
+			"aws_application_identity":   awsApplicationIdentityOutputs,
+			"azure_application_identity": azureApplicationIdentityOutputs,
+			"gcp_application_identity":   gcpApplicationIdentityOutputs,
 		},
 	}, nil
 }
