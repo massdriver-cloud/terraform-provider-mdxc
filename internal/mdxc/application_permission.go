@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 type AWSApplicationPermissionData struct {
@@ -164,14 +165,16 @@ func runApplicationPermissionFunctionGCP(function applicationPermissionFunctionG
 			},
 		},
 	}
+
 	convertApplicationPermissionConfigTerraformToGCP(d, &cloudApplicationPermissionConfig, config)
-	_, err := function(ctx, &cloudApplicationPermissionConfig, iamClient)
+	response, err := function(ctx, &cloudApplicationPermissionConfig, iamClient)
 	if err != nil {
 		diags.Append(
 			diag.NewErrorDiagnostic(err.Error(), ""),
 		)
 		return diags
 	}
+	tflog.Debug(ctx, "Permissions added for"+response.Email)
 	convertApplicationPermissionConfigGCPToTerraform(&cloudApplicationPermissionConfig, d)
 	return diags
 }
