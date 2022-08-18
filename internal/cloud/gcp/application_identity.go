@@ -30,9 +30,9 @@ type ApplicationIdentityConfig struct {
 
 type GCPIamIface interface {
 	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
-	Get(name string) *iam.ProjectsServiceAccountsGetCall
-	Patch(name string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
-	Delete(name string) *iam.ProjectsServiceAccountsDeleteCall
+	Get(email string) *iam.ProjectsServiceAccountsGetCall
+	Patch(email string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
+	Delete(email string) *iam.ProjectsServiceAccountsDeleteCall
 }
 
 func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
@@ -59,6 +59,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	config.ID = serviceAccount.UniqueId
+	config.Name = serviceAccount.DisplayName
 	config.Email = serviceAccount.Email
 
 	return nil
@@ -72,6 +73,7 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 	}
 
 	config.ID = serviceAccount.UniqueId
+	config.Name = serviceAccount.DisplayName
 	config.Email = serviceAccount.Email
 
 	return nil
