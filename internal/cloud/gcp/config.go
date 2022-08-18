@@ -26,7 +26,7 @@ func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPCon
 	gcpConfig := GCPConfig{
 		Provider:                  providerConfig,
 		NewIAMService:             gcpIAMClientFactory,
-		NewResourceManagerService: resourceManagerClientFactory,
+		NewResourceManagerService: gcpResourceManagerClientFactory,
 	}
 
 	log.Printf("[debug] Creating GCP TokenSource")
@@ -36,7 +36,6 @@ func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPCon
 	}
 
 	gcpConfig.TokenSource = cfg.TokenSource(ctx)
-	// gcpConfig.NewIAMService = gcpIAMClientFactory(ctx, gcpConfig.TokenSource)
 
 	log.Printf("[debug] GCP Config Created")
 	return &gcpConfig, nil

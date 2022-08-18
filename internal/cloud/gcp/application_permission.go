@@ -22,16 +22,12 @@ type ApplicationPermissionConfig struct {
 	Member           string
 }
 
-type GCPIAMResponse struct {
-	Email string
-}
-
 type GCPResourceManagerIface interface {
 	GetIamPolicy(resourceName string, getiampolicyrequest *cloudresourcemanager.GetIamPolicyRequest) *cloudresourcemanager.ProjectsGetIamPolicyCall
 	SetIamPolicy(resourceName string, setiampolicyrequest *cloudresourcemanager.SetIamPolicyRequest) *cloudresourcemanager.ProjectsSetIamPolicyCall
 }
 
-func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPResourceManagerIface, error) {
+func gcpResourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPResourceManagerIface, error) {
 	service, err := cloudresourcemanager.NewService(ctx, option.WithTokenSource(tokenSource))
 	if err != nil {
 		return nil, fmt.Errorf("cloudresourcemanager.NewService: %v", err)
@@ -40,36 +36,23 @@ func resourceManagerClientFactory(ctx context.Context, tokenSource oauth2.TokenS
 	return service.Projects, nil
 }
 
-func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
-	response := GCPIAMResponse{}
-
-	if errDo := readModifyWriteWithBackoff(ctx, config, client, AddToPolicy); errDo != nil {
-		return response, errDo
-	}
-
-	return response, nil
+func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+	return readModifyWriteWithBackoff(ctx, config, client, addToPolicy)
 }
 
-func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
-	response := GCPIAMResponse{}
-	return response, nil
+func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+	return nil
 }
 
-func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
-	response := GCPIAMResponse{}
-	return response, nil
+func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+	return nil
 }
 
-func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
-	response := GCPIAMResponse{}
-
-	if errDo := readModifyWriteWithBackoff(ctx, config, client, RemoveFromPolicy); errDo != nil {
-		return response, errDo
-	}
-
-	return response, nil
+func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+	return readModifyWriteWithBackoff(ctx, config, client, removeFromPolicy)
 }
 
+// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
 func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface, modifyFunc func(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error) error {
 	backoff := time.Second
 
@@ -79,7 +62,7 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 			return err
 		}
 
-		AddToPolicy(ctx, config.Role, config.Member, projectPolicy)
+		modifyFunc(ctx, config.Role, config.Member, projectPolicy)
 
 		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
 		if errSave == nil {
@@ -95,6 +78,30 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 			}
 			continue
 		}
+
+		// TODO: retry on not-found SA
+		// retry in the case that a service account is not found. This can happen when a service account is deleted
+		// out of band.
+		// if isServiceAccountNotFoundError, _ := iamServiceAccountNotFound(err); isServiceAccountNotFoundError {
+		// 	// calling a retryable function within a retry loop is not
+		// 	// strictly the _best_ idea, but this error only happens in
+		// 	// high-traffic projects anyways
+		// 	currentPolicy, rerr := iamPolicyReadWithRetry(updater)
+		// 	if rerr != nil {
+		// 		if p.Etag != currentPolicy.Etag {
+		// 			// not matching indicates that there is a new state to attempt to apply
+		// 			// log.Printf("current and old etag did not match for %s, retrying", updater.DescribeResource())
+		// 			time.Sleep(backoff)
+		// 			backoff = backoff * 2
+		// 			continue
+		// 		}
+
+		// 		// log.Printf("current and old etag matched for %s, not retrying", updater.DescribeResource())
+		// 	} else {
+		// 		// if the error is non-nil, just fall through and return the base error
+		// 		// log.Printf("[DEBUG]: error checking etag for policy %s. error: %v", updater.DescribeResource(), rerr)
+		// 	}
+		// }
 	}
 
 	return nil
@@ -125,8 +132,7 @@ func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, 
 	return nil
 }
 
-// good thing to test
-func AddToPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
+func addToPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
 	addedToExisting := false
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
@@ -148,8 +154,7 @@ func AddToPolicy(ctx context.Context, role string, member string, policy *cloudr
 	return nil
 }
 
-// good thing to test
-func RemoveFromPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
+func removeFromPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
 			membersToKeep := []string{}
@@ -164,11 +169,10 @@ func RemoveFromPolicy(ctx context.Context, role string, member string, policy *c
 	return nil
 }
 
-func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) (GCPIAMResponse, error) {
+func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
 	// namespace := "default"
 	// namePrefix := "example-apps"
 	// k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, namespace, namePrefix)
-	response := GCPIAMResponse{}
 	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
 	// if err != nil {
 	// 	return response, err
@@ -176,7 +180,7 @@ func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionC
 	// AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
 	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
 
-	return response, nil
+	return nil
 }
 
 func GetServiceAccountIamPolicy(projectId string, serviceId string) (*iam.Policy, error) {

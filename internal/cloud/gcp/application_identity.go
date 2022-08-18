@@ -65,8 +65,8 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
-	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	serviceAccount, doErr := iamClient.Get(serviceAccountResourceName).Do()
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	serviceAccount, doErr := iamClient.Get(resourceName).Do()
 	if doErr != nil {
 		return doErr
 	}
@@ -83,8 +83,8 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 			DisplayName: config.Name,
 		},
 	}
-	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	_, doErr := iamClient.Patch(serviceAccountResourceName, request).Do()
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	_, doErr := iamClient.Patch(resourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
@@ -92,10 +92,10 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
-	serviceAccountResourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
 
-	tflog.Debug(ctx, "------------------------------------------------------------------"+serviceAccountResourceName)
+	tflog.Debug(ctx, "------------------------------------------------------------------"+resourceName)
 
-	_, doErr := iamClient.Delete(serviceAccountResourceName).Do()
+	_, doErr := iamClient.Delete(resourceName).Do()
 	return doErr
 }

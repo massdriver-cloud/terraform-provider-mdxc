@@ -2,7 +2,6 @@ package mdxc
 
 import (
 	"context"
-	"log"
 	"terraform-provider-mdxc/internal/cloud/aws"
 	"terraform-provider-mdxc/internal/cloud/azure"
 	"terraform-provider-mdxc/internal/cloud/gcp"
@@ -36,7 +35,6 @@ type GCPApplicationIdentityOutputData struct {
 type ApplicationIdentityData struct {
 	Id          types.String                        `tfsdk:"id"`
 	Name        types.String                        `tfsdk:"name"`
-	Email       types.String                        `tfsdk:"service_account_email"`
 	Cloud       types.String                        `tfsdk:"cloud"`
 	AWSInput    *AWSApplicationIdentityInputData    `tfsdk:"aws_configuration"`
 	AzureInput  *AzureApplicationIdentityInputData  `tfsdk:"azure_configuration"`
@@ -196,27 +194,22 @@ func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, 
 	a.ID = d.Id.Value
 	a.Name = d.Name.Value
 	a.Project = c.Provider.Project.Value
-	a.Email = d.Email.Value
 	if d.GCPOutput != nil {
-		// a.Email = d.GCPOutput.ServiceAccountEmail.Value
+		a.Email = d.GCPOutput.ServiceAccountEmail.Value
 	}
 }
 
 func convertApplicationIdentityConfigGCPToTerraform(a *gcp.ApplicationIdentityConfig, d *ApplicationIdentityData) {
 	d.Id = types.String{Value: a.ID}
 	d.Name = types.String{Value: a.Name}
-	d.Email = types.String{Value: a.Email}
 	if d.GCPOutput == nil {
-		d.GCPOutput = &GCPApplicationIdentityOutputData{
-			ServiceAccountEmail: types.String{Value: a.Email},
-		}
+		d.GCPOutput = &GCPApplicationIdentityOutputData{}
 	}
 	d.GCPOutput.ServiceAccountEmail = types.String{Value: a.Email}
 }
 
 func runApplicationIdentityFunctionGCP(function applicationIdentityFunctionGCP, ctx context.Context, d *ApplicationIdentityData, config *gcp.GCPConfig) diag.Diagnostics {
 	var diags diag.Diagnostics
-	log.Printf("[debug] NewIAMService")
 	iamClient, serviceErr := config.NewIAMService(ctx, config.TokenSource)
 	if serviceErr != nil {
 		diags.Append(

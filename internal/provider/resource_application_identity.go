@@ -113,10 +113,6 @@ func (t ApplicationIdentityType) GetSchema(ctx context.Context) (tfsdk.Schema, d
 				Description: "The name of the IAM entity in the respective cloud (AWS IAM Role, GCP Service Account, Azure Application)",
 				Required:    true,
 			},
-			"service_account_email": {
-				Type:     types.StringType,
-				Computed: true,
-			},
 			"cloud": {
 				Type:                types.StringType,
 				MarkdownDescription: "The cloud the application identity was provisioned into (value will be `aws`, `azure` or `gcp`)",
