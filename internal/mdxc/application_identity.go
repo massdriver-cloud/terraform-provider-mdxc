@@ -195,7 +195,6 @@ func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, 
 	a.Name = d.Name.Value
 	a.Project = c.Provider.Project.Value
 	if d.GCPOutput != nil {
-		a.ServiceAccountEmail = d.GCPOutput.ServiceAccountEmail.Value
 	}
 }
 
@@ -205,7 +204,7 @@ func convertApplicationIdentityConfigGCPToTerraform(a *gcp.ApplicationIdentityCo
 	if d.GCPOutput == nil {
 		d.GCPOutput = &GCPApplicationIdentityOutputData{}
 	}
-	d.GCPOutput.ServiceAccountEmail = types.String{Value: a.ServiceAccountEmail}
+	d.GCPOutput.ServiceAccountEmail = types.String{Value: a.ID}
 }
 
 func runApplicationIdentityFunctionGCP(function applicationIdentityFunctionGCP, ctx context.Context, d *ApplicationIdentityData, config *gcp.GCPConfig) diag.Diagnostics {

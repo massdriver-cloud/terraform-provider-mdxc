@@ -22,10 +22,10 @@ import (
 // 	// TODO func CreateServiceAccountIAMMember()
 
 type ApplicationIdentityConfig struct {
-	ID                  string
-	Project             string
-	Name                string
-	ServiceAccountEmail string
+	ID      string
+	Project string
+	Name    string
+	// ServiceAccountEmail string
 }
 
 type GCPIamIface interface {
@@ -58,9 +58,8 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		return doErr
 	}
 
-	config.ID = serviceAccount.UniqueId
+	config.ID = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
-	config.ServiceAccountEmail = serviceAccount.Email
 
 	return nil
 }
@@ -72,9 +71,8 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 		return doErr
 	}
 
-	config.ID = serviceAccount.UniqueId
+	config.ID = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
-	config.ServiceAccountEmail = serviceAccount.Email
 
 	return nil
 }
