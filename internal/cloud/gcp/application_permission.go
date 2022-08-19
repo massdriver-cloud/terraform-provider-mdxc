@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
-	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
 
@@ -19,7 +18,6 @@ type ApplicationPermissionConfig struct {
 	Project          string
 	Role             string
 	Condition        string
-	Member           string
 }
 
 type GCPResourceManagerIface interface {
@@ -53,7 +51,7 @@ func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermiss
 }
 
 // https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
-func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface, modifyFunc func(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error) error {
+func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface, modifyFunc func(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error) error {
 	backoff := time.Second
 
 	for {
@@ -62,7 +60,7 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 			return err
 		}
 
-		modifyFunc(ctx, config.Role, config.Member, projectPolicy)
+		modifyFunc(ctx, config, projectPolicy)
 
 		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
 		if errSave == nil {
@@ -109,7 +107,6 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 
 // https://cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/create
 func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, projectId string) (*cloudresourcemanager.Policy, error) {
-	tflog.Debug(ctx, "getProjectIamPolicy "+projectId)
 	getCall := service.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{})
 	policy, errDo := getCall.Do()
 	if errDo != nil {
@@ -121,7 +118,6 @@ func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, p
 }
 
 func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, projectId string, policy *cloudresourcemanager.Policy) error {
-	tflog.Debug(ctx, "saveProjectIamPolicy "+projectId)
 	saveCall := service.SetIamPolicy(projectId, &cloudresourcemanager.SetIamPolicyRequest{
 		Policy: policy,
 	})
@@ -132,20 +128,28 @@ func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, 
 	return nil
 }
 
-func addToPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
+func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
+	role := config.Role
+	member := config.ID
 	addedToExisting := false
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
-			tflog.Debug(ctx, "adding to existing")
 			// TODO: dedupe members
 			binding.Members = append(binding.Members, fmt.Sprintf("serviceAccount:%s", member))
+			// this doesn't feel quite right and needs testing / verification
+			// we don't want the condition to apply to all members
+			binding.Condition = &cloudresourcemanager.Expr{
+				Expression: config.Condition,
+			}
 			addedToExisting = true
 		}
 	}
 	if !addedToExisting {
-		tflog.Debug(ctx, "adding new existing")
 		policy.Bindings = append(policy.Bindings, &cloudresourcemanager.Binding{
 			Role: role,
+			Condition: &cloudresourcemanager.Expr{
+				Expression: config.Condition,
+			},
 			Members: []string{
 				fmt.Sprintf("serviceAccount:%s", member),
 			},
@@ -154,7 +158,9 @@ func addToPolicy(ctx context.Context, role string, member string, policy *cloudr
 	return nil
 }
 
-func removeFromPolicy(ctx context.Context, role string, member string, policy *cloudresourcemanager.Policy) error {
+func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
+	role := config.Role
+	member := config.ID
 	for _, binding := range policy.Bindings {
 		if binding.Role == role {
 			membersToKeep := []string{}
@@ -181,19 +187,4 @@ func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionC
 	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
 
 	return nil
-}
-
-func GetServiceAccountIamPolicy(projectId string, serviceId string) (*iam.Policy, error) {
-	// ctx := context.Background()
-	// iamService, err := iam.NewService(ctx, option.WithCredentialsFile(jsonPath))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// getCall := iamService.Projects.ServiceAccounts.GetIamPolicy("projects/" + projectId + "/serviceAccounts/" + serviceId)
-	// iamPolicy, errGet := getCall.Do()
-	// if errGet != nil {
-	// 	return nil, errGet
-	// }
-
-	return nil, nil
 }

@@ -171,7 +171,7 @@ func convertApplicationPermissionConfigTerraformToGCP(d *ApplicationPermissionDa
 	a.Project = c.Provider.Project.Value
 	if d.GCPInput != nil {
 		a.Role = d.GCPInput.Role.Value
-		a.Member = d.ApplicationIdentityID.Value
+		a.ServiceAccountID = d.ApplicationIdentityID.Value
 		a.Condition = d.GCPInput.Condition.Value
 	}
 }
@@ -182,7 +182,7 @@ func convertApplicationPermissionConfigGCPToTerraform(a *gcp.ApplicationPermissi
 		d.GCPInput = &GCPApplicationPermissionInputData{}
 	}
 	d.GCPInput.Role = types.String{Value: a.Role}
-	d.ApplicationIdentityID = types.String{Value: a.Member}
+	d.ApplicationIdentityID = types.String{Value: a.ID}
 	d.GCPInput.Condition = types.String{Value: a.Condition}
 }
 

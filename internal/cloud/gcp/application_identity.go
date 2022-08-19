@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
@@ -93,9 +92,6 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
 	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-
-	tflog.Debug(ctx, "------------------------------------------------------------------"+resourceName)
-
 	_, doErr := iamClient.Delete(resourceName).Do()
 	return doErr
 }
