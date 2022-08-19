@@ -3,20 +3,23 @@ package aws
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 )
 
 type ApplicationPermissionConfig struct {
 	ID        string
-	RoleName  string
+	RoleARN   string
 	PolicyARN string
 }
 
 func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
 
+	roleName := getResourceNameFromARN(config.RoleARN)
+
 	roleInput := iam.AttachRolePolicyInput{
-		RoleName:  &config.RoleName,
+		RoleName:  &roleName,
 		PolicyArn: &config.PolicyARN,
 	}
 
@@ -25,7 +28,7 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 		return attachErr
 	}
 
-	config.ID = fmt.Sprintf("%s/%s", config.RoleName, config.PolicyARN)
+	config.ID = fmt.Sprintf("%s#%s", config.RoleARN, config.PolicyARN)
 
 	return nil
 }
@@ -39,9 +42,9 @@ func UpdateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 }
 
 func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client IAMClient) error {
-
+	roleName := getResourceNameFromARN(config.RoleARN)
 	input := iam.DetachRolePolicyInput{
-		RoleName:  &config.RoleName,
+		RoleName:  &roleName,
 		PolicyArn: &config.PolicyARN,
 	}
 
@@ -51,4 +54,9 @@ func DeleteApplicationPermission(ctx context.Context, config *ApplicationPermiss
 	}
 
 	return nil
+}
+
+func getResourceNameFromARN(arn string) string {
+	var nameRegex = regexp.MustCompile(`[^:/]*$`)
+	return nameRegex.FindString(arn)
 }

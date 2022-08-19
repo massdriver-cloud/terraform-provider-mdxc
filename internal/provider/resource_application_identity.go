@@ -14,11 +14,11 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces
-var _ provider.ResourceType = ApplicationIdentityType{}
-var _ resource.Resource = ApplicationIdentity{}
-var _ resource.ResourceWithImportState = ApplicationIdentity{}
+var _ provider.ResourceType = ResourceApplicationIdentityType{}
+var _ resource.Resource = ResourceApplicationIdentity{}
+var _ resource.ResourceWithImportState = ResourceApplicationIdentity{}
 
-type ApplicationIdentityType struct{}
+type ResourceApplicationIdentityType struct{}
 
 var awsApplicationIdentityInputs = tfsdk.Attribute{
 	Optional:    true,
@@ -95,7 +95,7 @@ var gcpApplicationIdentityOutputs = tfsdk.Attribute{
 	}),
 }
 
-func (t ApplicationIdentityType) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostics) {
+func (t ResourceApplicationIdentityType) GetSchema(ctx context.Context) (tfsdk.Schema, diag.Diagnostics) {
 	return tfsdk.Schema{
 		MarkdownDescription: "A cross-cloud application identity resource (AWS IAM Role, GCP Service Account, Azure Application)",
 
@@ -128,17 +128,17 @@ func (t ApplicationIdentityType) GetSchema(ctx context.Context) (tfsdk.Schema, d
 	}, nil
 }
 
-func (t ApplicationIdentityType) NewResource(ctx context.Context, in provider.Provider) (resource.Resource, diag.Diagnostics) {
-	return ApplicationIdentity{
+func (t ResourceApplicationIdentityType) NewResource(ctx context.Context, in provider.Provider) (resource.Resource, diag.Diagnostics) {
+	return ResourceApplicationIdentity{
 		provider: *(in.(*MDXCProvider)),
 	}, diag.Diagnostics{}
 }
 
-type ApplicationIdentity struct {
+type ResourceApplicationIdentity struct {
 	provider MDXCProvider
 }
 
-func (r ApplicationIdentity) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r ResourceApplicationIdentity) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data mdxc.ApplicationIdentityData
 
 	diags := req.Config.Get(ctx, &data)
@@ -159,7 +159,7 @@ func (r ApplicationIdentity) Create(ctx context.Context, req resource.CreateRequ
 	resp.Diagnostics.Append(diags...)
 }
 
-func (r ApplicationIdentity) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r ResourceApplicationIdentity) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var data mdxc.ApplicationIdentityData
 
 	diags := req.State.Get(ctx, &data)
@@ -178,7 +178,7 @@ func (r ApplicationIdentity) Read(ctx context.Context, req resource.ReadRequest,
 	resp.Diagnostics.Append(diags...)
 }
 
-func (r ApplicationIdentity) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r ResourceApplicationIdentity) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data mdxc.ApplicationIdentityData
 
 	diags := req.Plan.Get(ctx, &data)
@@ -197,7 +197,7 @@ func (r ApplicationIdentity) Update(ctx context.Context, req resource.UpdateRequ
 	resp.Diagnostics.Append(diags...)
 }
 
-func (r ApplicationIdentity) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r ResourceApplicationIdentity) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var data mdxc.ApplicationIdentityData
 
 	diags := req.State.Get(ctx, &data)
@@ -216,6 +216,6 @@ func (r ApplicationIdentity) Delete(ctx context.Context, req resource.DeleteRequ
 	resp.Diagnostics.Append(diags...)
 }
 
-func (r ApplicationIdentity) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r ResourceApplicationIdentity) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

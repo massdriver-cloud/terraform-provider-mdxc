@@ -130,14 +130,16 @@ func (p *MDXCProvider) GetSchema(_ context.Context) (tfsdk.Schema, diag.Diagnost
 
 func (p *MDXCProvider) GetResources(_ context.Context) (map[string]provider.ResourceType, diag.Diagnostics) {
 	return map[string]provider.ResourceType{
-		"mdxc_application_identity":   ApplicationIdentityType{},
-		"mdxc_application_permission": ApplicationPermissionType{},
+		"mdxc_application_identity":   ResourceApplicationIdentityType{},
+		"mdxc_application_permission": ResourceApplicationPermissionType{},
 	}, nil
 }
 
 // GetDataSources - Defines Provider data sources
 func (p *MDXCProvider) GetDataSources(_ context.Context) (map[string]provider.DataSourceType, diag.Diagnostics) {
-	return map[string]provider.DataSourceType{}, nil
+	return map[string]provider.DataSourceType{
+		"mdxc_cloud": DataSourceCloudType{},
+	}, nil
 }
 
 func (p *MDXCProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {

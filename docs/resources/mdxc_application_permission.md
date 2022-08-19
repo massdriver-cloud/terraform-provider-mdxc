@@ -18,40 +18,20 @@ A cross-cloud application Permission resource (AWS IAM Role, GCP Service Account
 ### Required
 
 - `application_identity_id` (String) The ID of the Application Permission resource
-
-### Optional
-
-- `aws_configuration` (Attributes) AWS IAM Role Configuration (see [below for nested schema](#nestedatt--aws_configuration))
-- `azure_configuration` (Attributes) Azure IAM Role Configuration (see [below for nested schema](#nestedatt--azure_configuration))
-- `gcp_configuration` (Attributes) Azure IAM Role Configuration (see [below for nested schema](#nestedatt--gcp_configuration))
+- `permission` (Attributes) Permission definition to assign application identity (see [below for nested schema](#nestedatt--permission))
 
 ### Read-Only
 
 - `id` (String) Cloud specific identifier of the application Permission
 
-<a id="nestedatt--aws_configuration"></a>
-### Nested Schema for `aws_configuration`
+<a id="nestedatt--permission"></a>
+### Nested Schema for `permission`
 
-Required:
+Optional:
 
+- `condition` (String) An GCP IAM Condition for a given role binding
 - `policy_arn` (String) AWS IAM policy ARN to associate with the application identity
-
-
-<a id="nestedatt--azure_configuration"></a>
-### Nested Schema for `azure_configuration`
-
-Required:
-
-- `role_name` (String) The Azure built-in IAM role to bind to the application identity
-- `scope` (String) The scope at which the Role Assignment applies to
-
-
-<a id="nestedatt--gcp_configuration"></a>
-### Nested Schema for `gcp_configuration`
-
-Required:
-
-- `condition` (String) An IAM Condition for a given role binding
-- `role_name` (String) The GCP role to bind to the application identity
+- `role_name` (String) The Azure or GCP built-in IAM role to bind to the application identity
+- `scope` (String) The scope at which the Azure Role Assignment applies to
 
 
