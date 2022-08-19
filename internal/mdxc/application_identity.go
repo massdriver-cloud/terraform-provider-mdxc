@@ -107,7 +107,7 @@ func convertApplicationIdentityConfigTerraformToAWS(d *ApplicationIdentityData, 
 }
 
 func convertApplicationIdentityConfigAWSToTerraform(a *aws.ApplicationIdentityConfig, d *ApplicationIdentityData) {
-	d.Id = types.String{Value: a.Name}
+	d.Id = types.String{Value: a.IAMRoleARN}
 	d.Name = types.String{Value: a.Name}
 	if d.AWSInput == nil {
 		d.AWSInput = &AWSApplicationIdentityInputData{}

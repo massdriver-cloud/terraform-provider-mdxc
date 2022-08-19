@@ -9,24 +9,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type AWSApplicationPermissionInputData struct {
+type ApplicationPermissionPermissionData struct {
 	PolicyARN types.String `tfsdk:"policy_arn"`
-}
-type AzureApplicationPermissionInputData struct {
-	RoleName types.String `tfsdk:"role_name"`
-	Scope    types.String `tfsdk:"scope"`
-}
-type GCPApplicationPermissionInputData struct {
 	RoleName  types.String `tfsdk:"role_name"`
+	Scope     types.String `tfsdk:"scope"`
 	Condition types.String `tfsdk:"condition"`
 }
 
 type ApplicationPermissionData struct {
 	Id                    types.String                         `tfsdk:"id"`
 	ApplicationIdentityID types.String                         `tfsdk:"application_identity_id"`
-	AWSInput              *AWSApplicationPermissionInputData   `tfsdk:"aws_configuration"`
-	AzureInput            *AzureApplicationPermissionInputData `tfsdk:"azure_configuration"`
-	GCPInput              *GCPApplicationPermissionInputData   `tfsdk:"gcp_configuration"`
+	Permission            *ApplicationPermissionPermissionData `tfsdk:"permission"`
 }
 
 func (c *MDXCClient) CreateApplicationPermission(ctx context.Context, d *ApplicationPermissionData) diag.Diagnostics {
@@ -82,19 +75,19 @@ type applicationPermissionFunctionAWS func(context.Context, *aws.ApplicationPerm
 
 func convertApplicationPermissionConfigTerraformToAWS(d *ApplicationPermissionData, a *aws.ApplicationPermissionConfig) {
 	a.ID = d.Id.Value
-	a.RoleName = d.ApplicationIdentityID.Value
-	if d.AWSInput != nil {
-		a.PolicyARN = d.AWSInput.PolicyARN.Value
+	a.RoleARN = d.ApplicationIdentityID.Value
+	if d.Permission != nil {
+		a.PolicyARN = d.Permission.PolicyARN.Value
 	}
 }
 
 func convertApplicationPermissionConfigAWSToTerraform(a *aws.ApplicationPermissionConfig, d *ApplicationPermissionData) {
 	d.Id = types.String{Value: a.ID}
-	d.ApplicationIdentityID = types.String{Value: a.RoleName}
-	if d.AWSInput == nil {
-		d.AWSInput = &AWSApplicationPermissionInputData{}
+	d.ApplicationIdentityID = types.String{Value: a.RoleARN}
+	if d.Permission == nil {
+		d.Permission = &ApplicationPermissionPermissionData{}
 	}
-	d.AWSInput.PolicyARN = types.String{Value: a.PolicyARN}
+	d.Permission.PolicyARN = types.String{Value: a.PolicyARN}
 }
 
 func runApplicationPermissionFunctionAWS(function applicationPermissionFunctionAWS, ctx context.Context, d *ApplicationPermissionData, config *aws.AWSConfig) diag.Diagnostics {
@@ -118,19 +111,19 @@ type applicationPermissionFunctionAzure func(context.Context, *azure.Application
 
 func convertApplicationPermissionConfigTerraformToAzure(d *ApplicationPermissionData, a *azure.ApplicationPermissionConfig) {
 	a.ID = d.Id.Value
-	if d.AzureInput != nil {
-		a.RoleName = d.AzureInput.RoleName.Value
-		a.Scope = d.AzureInput.Scope.Value
+	if d.Permission != nil {
+		a.RoleName = d.Permission.RoleName.Value
+		a.Scope = d.Permission.Scope.Value
 	}
 }
 
 func convertApplicationPermissionConfigAzureToTerraform(a *azure.ApplicationPermissionConfig, d *ApplicationPermissionData) {
 	d.Id = types.String{Value: a.ID}
-	if d.AzureInput == nil {
-		d.AzureInput = &AzureApplicationPermissionInputData{}
+	if d.Permission == nil {
+		d.Permission = &ApplicationPermissionPermissionData{}
 	}
-	d.AzureInput.RoleName = types.String{Value: a.RoleName}
-	d.AzureInput.Scope = types.String{Value: a.Scope}
+	d.Permission.RoleName = types.String{Value: a.RoleName}
+	d.Permission.Scope = types.String{Value: a.Scope}
 }
 
 func runApplicationPermissionFunctionAzure(function applicationPermissionFunctionAzure, ctx context.Context, d *ApplicationPermissionData, config *azure.AzureConfig) diag.Diagnostics {

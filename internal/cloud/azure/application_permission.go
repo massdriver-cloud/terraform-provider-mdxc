@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
 )
@@ -37,7 +39,15 @@ type RoleDefinitionsClient interface {
 }
 
 func (c *AzureConfig) NewRoleDefinitionsClient(ctx context.Context) (RoleDefinitionsClient, error) {
-	authorizer, authorizerErr := c.authConfig.NewAuthorizer(ctx, c.authConfig.Environment.MsGraph)
+	_, err := azidentity.NewClientSecretCredential(
+		c.provider.TenantID.Value,
+		c.provider.ClientID.Value,
+		c.provider.ClientSecret.Value, nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+	authorizer, authorizerErr := c.authConfig.NewAuthorizer(ctx, c.authConfig.Environment.Storage)
 	if authorizerErr != nil {
 		return nil, authorizerErr
 	}
@@ -48,15 +58,20 @@ func (c *AzureConfig) NewRoleDefinitionsClient(ctx context.Context) (RoleDefinit
 
 func CreateApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, raClient RoleAssignmentsClient, rdClient RoleDefinitionsClient) error {
 
-	roleDefinitions, _, err := rdClient.List(ctx, odata.Query{
-		Filter: fmt.Sprintf("displayName:Storage Blob Data Contributor"),
+	roleDefinitions, _, err := rdClient.List(ctx, odata.Query{ //})
+		Filter: fmt.Sprintf("displayName eq '%s'", config.RoleName),
+		//Filter: fmt.Sprintf("roleName eq '%s'", config.RoleName),
 	})
 	if err != nil {
 		return fmt.Errorf("loading Role Definition List: %+v", err)
 	}
-	if len(*roleDefinitions) != 1 {
-		return fmt.Errorf("loading Role Definition List: could not find role '%s'", config.RoleName)
+	for _, rd := range *roleDefinitions {
+		str := fmt.Sprintf("\nDisplayName: %v\nID: %v\n\n", *rd.DisplayName, *rd.ID)
+		tflog.Debug(ctx, str)
 	}
+	// if len(*roleDefinitions) != 1 {
+	// 	return fmt.Errorf("loading Role Definition List: could not find role '%s'", config.RoleName)
+	// }
 	roleDefinitionId := (*roleDefinitions)[0].ID
 	// properties := authorization.RoleAssignmentCreateParameters{
 	// 	RoleAssignmentProperties: &authorization.RoleAssignmentProperties{
