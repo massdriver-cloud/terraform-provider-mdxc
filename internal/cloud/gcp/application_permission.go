@@ -174,17 +174,3 @@ func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, 
 	}
 	return nil
 }
-
-func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	// namespace := "default"
-	// namePrefix := "example-apps"
-	// k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, namespace, namePrefix)
-	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	// if err != nil {
-	// 	return response, err
-	// }
-	// AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
-	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
-
-	return nil
-}

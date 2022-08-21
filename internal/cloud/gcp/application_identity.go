@@ -5,6 +5,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
@@ -32,6 +33,7 @@ type GCPIamIface interface {
 	Get(email string) *iam.ProjectsServiceAccountsGetCall
 	Patch(email string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
 	Delete(email string) *iam.ProjectsServiceAccountsDeleteCall
+	SetIamPolicy(resource string, setiampolicyrequest *iam.SetIamPolicyRequest) *iam.ProjectsServiceAccountsSetIamPolicyCall
 }
 
 func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
@@ -94,4 +96,29 @@ func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
 	_, doErr := iamClient.Delete(resourceName).Do()
 	return doErr
+}
+
+func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, iamClient GCPIamIface) error {
+	member := config.ID
+	namePrefix := strings.Split(member, "@")[0]
+	namespace := "default"
+	k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, namespace, namePrefix)
+	iamClient.SetIamPolicy(config.ID, &iam.SetIamPolicyRequest{
+		Policy: &iam.Policy{
+			Bindings: []*iam.Binding{
+				{
+					Role:    "roles/iam.workloadIdentityUser",
+					Members: []string{k8sEmail},
+				},
+			},
+		},
+	}).Do()
+	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+	// if err != nil {
+	// 	return response, err
+	// }
+	// AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
+	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+
+	return nil
 }
