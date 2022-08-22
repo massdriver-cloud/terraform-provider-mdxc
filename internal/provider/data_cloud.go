@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -27,6 +28,11 @@ func (t DataSourceCloudType) GetSchema(ctx context.Context) (tfsdk.Schema, diag.
 				Computed:            true,
 				Type:                types.StringType,
 			},
+			"id": {
+				MarkdownDescription: "The ID of the underlying cloud scope. For AWS, it will be the account ID, for GCP it will be the project ID, for Azure it will be the subcription ID.",
+				Computed:            true,
+				Type:                types.StringType,
+			},
 		},
 	}, nil
 }
@@ -39,6 +45,7 @@ func (t DataSourceCloudType) NewDataSource(ctx context.Context, in provider.Prov
 
 type DataSourceCloudData struct {
 	Cloud types.String `tfsdk:"cloud"`
+	ID    types.String `tfsdk:"id"`
 }
 
 type DataSourceCloud struct {
@@ -56,6 +63,19 @@ func (d DataSourceCloud) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	data.Cloud = types.String{Value: d.provider.Client.Cloud}
+
+	switch data.Cloud.Value {
+	case "aws":
+		accountId := strings.Split(d.provider.Client.AWSConfig.Provider.AwsRoleArn.Value, ":")[4]
+		data.ID = types.String{Value: accountId}
+	case "gcp":
+		data.ID = types.String{Value: d.provider.Client.GCPConfig.Provider.Project.Value}
+	case "azure":
+		data.ID = types.String{Value: d.provider.Client.AzureConfig.Provider.SubscriptionID.Value}
+	default:
+		resp.Diagnostics.Append(diag.NewErrorDiagnostic("Unrecognized cloud", "Failed to recognize cloud when extracting the ID: "+data.Cloud.Value))
+		return
+	}
 
 	diags = resp.State.Set(ctx, &data)
 	resp.Diagnostics.Append(diags...)
