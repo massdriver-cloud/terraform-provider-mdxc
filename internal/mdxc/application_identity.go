@@ -18,8 +18,6 @@ type AWSApplicationIdentityInputData struct {
 type GCPApplicationIdentityInputData struct {
 	Kubernetes GCPKubernetesIdentityInputData `tfsdk:"kubernetes"`
 }
-
-// made this kubernetes config specific to GCP, since it's nested under the gcp config
 type GCPKubernetesIdentityInputData struct {
 	Namespace          types.String `tfsdk:"namespace"`
 	ServiceAccountName types.String `tfsdk:"service_account_name"`
