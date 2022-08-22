@@ -54,6 +54,9 @@ var gcpApplicationIdentityInputs = tfsdk.Attribute{
 				"namespace": {
 					Type: types.StringType,
 				},
+				"service_account_email": {
+					Type: types.StringType,
+				},
 			}),
 		},
 	}),
