@@ -52,12 +52,12 @@ func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
 // }
 
 type ApplicationIdentityConfig struct {
-	ID                            string
-	Project                       string
-	Name                          string
-	ServiceAccountEmail           string
-	KubernetesNamspace            string
-	KubernetesServiceAccountEmail string
+	ID                           string
+	Project                      string
+	Name                         string
+	ServiceAccountEmail          string
+	KubernetesNamspace           string
+	KubernetesServiceAccountName string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
@@ -79,6 +79,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	config.ID = serviceAccountOutput.Email
 	config.ServiceAccountEmail = serviceAccountOutput.Email
 	// TODO: wire up k8s service account role grant after gcp is merged
+	// k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, config.KubernetesNamespace, config.KubernetesServiceAccountName)
 
 	return nil
 }
