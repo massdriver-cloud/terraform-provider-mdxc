@@ -56,6 +56,7 @@ type ApplicationIdentityConfig struct {
 	Project             string
 	Name                string
 	ServiceAccountEmail string
+	KubernetesNamspace  string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {

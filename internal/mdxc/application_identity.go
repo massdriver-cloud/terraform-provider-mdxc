@@ -14,8 +14,14 @@ import (
 type AWSApplicationIdentityInputData struct {
 	AssumeRolePolicy types.String `tfsdk:"assume_role_policy"`
 }
+
 type GCPApplicationIdentityInputData struct {
-	Placeholder types.String `tfsdk:"placeholder"`
+	Kubernetes GCPKubernetesIdentityInputData `tfsdk:"kubernetes"`
+}
+
+// made this kubernetes config specific to GCP, since it's nested under the gcp config
+type GCPKubernetesIdentityInputData struct {
+	Namespace types.String `tfsdk:"namespace"`
 }
 type AzureApplicationIdentityInputData struct {
 	Placeholder types.String `tfsdk:"placeholder"`
@@ -195,6 +201,9 @@ func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, 
 	a.ID = d.Id.Value
 	a.Name = d.Name.Value
 	a.Project = c.Provider.Project.Value
+	if d.GCPInput != nil {
+		a.KubernetesNamspace = d.GCPInput.Kubernetes.Namespace.Value
+	}
 	if d.GCPOutput != nil {
 		a.ServiceAccountEmail = d.GCPOutput.ServiceAccountEmail.Value
 	}
