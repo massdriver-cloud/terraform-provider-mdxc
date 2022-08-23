@@ -2,7 +2,6 @@ package gcp
 
 import (
 	"context"
-	"log"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -29,7 +28,6 @@ func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPCon
 		NewResourceManagerService: gcpResourceManagerClientFactory,
 	}
 
-	log.Printf("[debug] Creating GCP TokenSource")
 	cfg, err := google.JWTConfigFromJSON([]byte(providerConfig.Credentials.Value), "https://www.googleapis.com/auth/cloud-platform")
 	if err != nil {
 		return nil, err
@@ -37,6 +35,5 @@ func Initialize(ctx context.Context, providerConfig *GCPProviderConfig) (*GCPCon
 
 	gcpConfig.TokenSource = cfg.TokenSource(ctx)
 
-	log.Printf("[debug] GCP Config Created")
 	return &gcpConfig, nil
 }

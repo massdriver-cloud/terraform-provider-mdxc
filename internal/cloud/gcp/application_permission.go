@@ -39,26 +39,6 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 }
 
 func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	// if err != nil {
-	// 	return err
-	// }
-	// binding := &cloudresourcemanager.Binding{}
-	// for _, b := range projectPolicy.Bindings {
-	// 	if b.Role == config.Role {
-	// 		for _, member := range b.Members {
-	// 			if member == fmt.Sprintf("serviceAccount:%s", config.ServiceAccountID) {
-	// 				binding = b
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// if binding.Role == "" {
-	// 	return fmt.Errorf("application permission does not exist")
-	// }
-	// config.Role = binding.Role
-	// config.Condition = binding.Condition.Expression
-
 	return nil
 }
 
@@ -95,37 +75,13 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 			time.Sleep(backoff)
 			backoff = backoff * 2
 			if backoff > 30*time.Second {
-				return errwrap.Wrapf(fmt.Sprintf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", "create permission"), err)
+				return errwrap.Wrapf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", err)
 			}
 			continue
 		}
 		if errSave != nil {
 			return errSave
 		}
-
-		// TODO: retry on not-found SA
-		// retry in the case that a service account is not found. This can happen when a service account is deleted
-		// out of band.
-		// if isServiceAccountNotFoundError, _ := iamServiceAccountNotFound(err); isServiceAccountNotFoundError {
-		// 	// calling a retryable function within a retry loop is not
-		// 	// strictly the _best_ idea, but this error only happens in
-		// 	// high-traffic projects anyways
-		// 	currentPolicy, rerr := iamPolicyReadWithRetry(updater)
-		// 	if rerr != nil {
-		// 		if p.Etag != currentPolicy.Etag {
-		// 			// not matching indicates that there is a new state to attempt to apply
-		// 			// log.Printf("current and old etag did not match for %s, retrying", updater.DescribeResource())
-		// 			time.Sleep(backoff)
-		// 			backoff = backoff * 2
-		// 			continue
-		// 		}
-
-		// 		// log.Printf("current and old etag matched for %s, not retrying", updater.DescribeResource())
-		// 	} else {
-		// 		// if the error is non-nil, just fall through and return the base error
-		// 		// log.Printf("[DEBUG]: error checking etag for policy %s. error: %v", updater.DescribeResource(), rerr)
-		// 	}
-		// }
 	}
 
 	config.ID = fmt.Sprintf("%s-%s", config.ServiceAccountID, config.Role)
