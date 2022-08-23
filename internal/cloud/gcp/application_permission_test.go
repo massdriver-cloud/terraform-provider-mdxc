@@ -3,6 +3,7 @@ package gcp_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"terraform-provider-mdxc/internal/cloud/gcp"
@@ -39,18 +40,18 @@ func createMockPermissionClient() (gcp.GCPResourceManagerIface, error) {
 	return service.Projects, nil
 }
 
-func TestReadPermission(t *testing.T) {
+func TestCreatePermission(t *testing.T) {
 	ctx := context.Background()
 	config := &gcp.ApplicationPermissionConfig{
-		ID: "test",
+		ServiceAccountID: "test-name-prefix@test-project.iam.gserviceaccount.com",
+		Role:             "roles/redis.viewer",
+		Condition:        "resource.name.startsWith(\"projects/test-project/locations/us-central1/instances/test-instance\")",
+		Project:          "test-project",
 	}
 	client, _ := createMockPermissionClient()
-	_ = gcp.ReadApplicationPermission(ctx, config, client)
+	_ = gcp.CreateApplicationPermission(ctx, config, client)
 
-	// got := response.Email
-	// want := "test@PROJECT_ID.iam.gserviceaccount.com"
+	permissionID := fmt.Sprintf("%s-%s", config.ServiceAccountID, config.Role)
 
-	// if want != got {
-	// 	t.Errorf("expect %v, got %v", want, got)
-	// }
+	compare(t, config.ID, permissionID)
 }

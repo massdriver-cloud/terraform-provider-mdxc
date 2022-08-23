@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/errwrap"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
@@ -129,6 +128,8 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 		// }
 	}
 
+	config.ID = fmt.Sprintf("%s-%s", config.ServiceAccountID, config.Role)
+
 	return nil
 }
 
@@ -157,7 +158,6 @@ func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, 
 func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
 	role := config.Role
 	member := config.ServiceAccountID
-	tflog.Debug(ctx, fmt.Sprintf("addToPolicy %+v", config))
 
 	policy.Bindings = oss.AddBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
@@ -168,7 +168,6 @@ func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, polic
 			fmt.Sprintf("serviceAccount:%s", member),
 		},
 	})
-	tflog.Debug(ctx, fmt.Sprintf("added %s", member))
 
 	return nil
 }

@@ -81,9 +81,7 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 		return doErr
 	}
 
-	config.ID = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
-	config.Project = serviceAccount.ProjectId
 
 	return nil
 }
@@ -120,11 +118,13 @@ func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityCon
 
 	// TODO: test if idempotent
 	iamPolicy.Bindings = append(iamPolicy.Bindings, &iam.Binding{
-		Role:    "roles/iam.workloadIdentityUser",
-		Members: []string{k8sEmail},
+		Role: "roles/iam.workloadIdentityUser",
+		Members: []string{
+			fmt.Sprintf("serviceAccount:%s", k8sEmail),
+		},
 	})
 
-	_, errSet := client.SetIamPolicy(config.ID, &iam.SetIamPolicyRequest{
+	_, errSet := client.SetIamPolicy(resourceName, &iam.SetIamPolicyRequest{
 		Policy: iamPolicy,
 	}).Do()
 	if errSet != nil {

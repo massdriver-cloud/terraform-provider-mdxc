@@ -52,10 +52,12 @@ var gcpApplicationIdentityInputs = tfsdk.Attribute{
 			Description: "Kubernetes configuration",
 			Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
 				"namespace": {
-					Type: types.StringType,
+					Type:     types.StringType,
+					Required: true,
 				},
 				"service_account_name": {
-					Type: types.StringType,
+					Type:     types.StringType,
+					Required: true,
 				},
 			}),
 		},

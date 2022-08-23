@@ -52,13 +52,12 @@ func TestCreateIdentity(t *testing.T) {
 
 	compare(t, config.ID, "test-name-prefix@test-project.iam.gserviceaccount.com")
 	compare(t, config.Name, "test-name-prefix")
-	compare(t, config.Project, "test-project")
 }
 
 func TestReadIdentity(t *testing.T) {
 	ctx := context.Background()
 	config := &gcp.ApplicationIdentityConfig{
-		Name:    "test-name-prefix",
+		ID:      "test-name-prefix@test-project.iam.gserviceaccount.com",
 		Project: "test-project",
 	}
 	client, _ := createMockIamClient()
@@ -66,7 +65,6 @@ func TestReadIdentity(t *testing.T) {
 
 	compare(t, config.ID, "test-name-prefix@test-project.iam.gserviceaccount.com")
 	compare(t, config.Name, "test-name-prefix")
-	compare(t, config.Project, "test-project")
 }
 
 func compare(t *testing.T, got string, want string) {
