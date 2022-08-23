@@ -33,5 +33,3 @@ Optional:
 - `policy_arn` (String) AWS IAM policy ARN to associate with the application identity
 - `role_name` (String) The Azure or GCP built-in IAM role to bind to the application identity
 - `scope` (String) The scope at which the Azure Role Assignment applies to
-
-

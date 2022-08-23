@@ -19,8 +19,11 @@ func createMockPermissionClient() (gcp.GCPResourceManagerIface, error) {
 		resp := &cloudresourcemanager.Policy{
 			Bindings: []*cloudresourcemanager.Binding{
 				{
-					Role:    "roles/owner",
-					Members: []string{},
+					Role: "roles/redis.viewer",
+					Members: []string{
+						"serviceAccount:test-name-prefix@test-project.iam.gserviceaccount.com",
+					},
+					Condition: &cloudresourcemanager.Expr{},
 				},
 			},
 		}
@@ -54,4 +57,18 @@ func TestCreatePermission(t *testing.T) {
 	permissionID := fmt.Sprintf("%s-%s", config.ServiceAccountID, config.Role)
 
 	compare(t, config.ID, permissionID)
+}
+
+func TestReadPermission(t *testing.T) {
+	ctx := context.Background()
+	config := &gcp.ApplicationPermissionConfig{
+		ServiceAccountID: "test-name-prefix@test-project.iam.gserviceaccount.com",
+		Role:             "roles/redis.viewer",
+		Condition:        "resource.name.startsWith(\"projects/test-project/locations/us-central1/instances/test-instance\")",
+		Project:          "test-project",
+	}
+	client, _ := createMockPermissionClient()
+	_ = gcp.ReadApplicationPermission(ctx, config, client)
+
+	// TODO: Add assertions
 }

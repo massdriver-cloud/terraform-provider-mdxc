@@ -81,5 +81,3 @@ Read-Only:
 Read-Only:
 
 - `service_account_email` (String)
-
-
