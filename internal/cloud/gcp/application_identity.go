@@ -62,6 +62,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	config.ID = serviceAccount.Email
+	config.ServiceAccountEmail = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
 
 	if config.KubernetesNamspace != "" {

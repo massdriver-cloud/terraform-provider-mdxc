@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/errwrap"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
@@ -18,12 +19,6 @@ type ApplicationPermissionConfig struct {
 	Project          string
 	Role             string
 	Condition        string
-}
-
-type ApplicationPermissionResponse struct {
-	ID        string
-	Role      string
-	Condition string
 }
 
 type GCPResourceManagerIface interface {
@@ -45,25 +40,25 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 }
 
 func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
-	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	if err != nil {
-		return err
-	}
-	binding := &cloudresourcemanager.Binding{}
-	for _, b := range projectPolicy.Bindings {
-		if b.Role == config.Role {
-			for _, member := range b.Members {
-				if member == fmt.Sprintf("serviceAccount:%s", config.ServiceAccountID) {
-					binding = b
-				}
-			}
-		}
-	}
-	if binding.Role == "" {
-		return fmt.Errorf("application permission does not exist")
-	}
-	config.Role = binding.Role
-	config.Condition = binding.Condition.Expression
+	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+	// if err != nil {
+	// 	return err
+	// }
+	// binding := &cloudresourcemanager.Binding{}
+	// for _, b := range projectPolicy.Bindings {
+	// 	if b.Role == config.Role {
+	// 		for _, member := range b.Members {
+	// 			if member == fmt.Sprintf("serviceAccount:%s", config.ServiceAccountID) {
+	// 				binding = b
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// if binding.Role == "" {
+	// 	return fmt.Errorf("application permission does not exist")
+	// }
+	// config.Role = binding.Role
+	// config.Condition = binding.Condition.Expression
 
 	return nil
 }
@@ -81,26 +76,32 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 	backoff := time.Second
 
 	for {
-		projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+		policy, err := getProjectIamPolicy(ctx, client, config.Project)
 		if err != nil {
 			return err
 		}
 
-		modifyFunc(ctx, config, projectPolicy)
+		errModify := modifyFunc(ctx, config, policy)
+		if errModify != nil {
+			return errModify
+		}
 
-		errSave := saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+		errSave := saveProjectIamPolicy(ctx, client, config.Project, policy)
 		if errSave == nil {
 			// TODO: fetch again I think?
 			// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
 			break
 		}
-		if isConflictError(errSave) {
+		if oss.IsConflictError(errSave) {
 			time.Sleep(backoff)
 			backoff = backoff * 2
 			if backoff > 30*time.Second {
 				return errwrap.Wrapf(fmt.Sprintf("Error applying IAM policy to %s: Too many conflicts.  Latest error: {{err}}", "create permission"), err)
 			}
 			continue
+		}
+		if errSave != nil {
+			return errSave
 		}
 
 		// TODO: retry on not-found SA
@@ -155,7 +156,8 @@ func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, 
 
 func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
 	role := config.Role
-	member := config.ID
+	member := config.ServiceAccountID
+	tflog.Debug(ctx, fmt.Sprintf("addToPolicy %+v", config))
 
 	policy.Bindings = oss.AddBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
@@ -166,13 +168,14 @@ func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, polic
 			fmt.Sprintf("serviceAccount:%s", member),
 		},
 	})
+	tflog.Debug(ctx, fmt.Sprintf("added %s", member))
 
 	return nil
 }
 
 func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
 	role := config.Role
-	member := config.ID
+	member := config.ServiceAccountID
 
 	policy.Bindings = oss.RemoveBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
