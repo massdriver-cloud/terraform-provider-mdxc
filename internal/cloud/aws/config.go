@@ -33,7 +33,7 @@ type AWSProviderConfig struct {
 }
 
 type AWSConfig struct {
-	provider *AWSProviderConfig
+	Provider *AWSProviderConfig
 	config   *aws.Config
 }
 
@@ -54,7 +54,7 @@ func Initialize(ctx context.Context, providerConfig *AWSProviderConfig) (*AWSCon
 	log.Printf("[debug] AWS Config Created")
 
 	awsClient.config = &cfg
-	awsClient.provider = providerConfig
+	awsClient.Provider = providerConfig
 
 	return &awsClient, nil
 }

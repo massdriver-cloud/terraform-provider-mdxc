@@ -17,14 +17,14 @@ type AzureProviderConfig struct {
 }
 
 type AzureConfig struct {
-	provider   *AzureProviderConfig
+	Provider   *AzureProviderConfig
 	authConfig *auth.Config
 }
 
 func Initialize(ctx context.Context, providerConfig *AzureProviderConfig) (*AzureConfig, error) {
 	azureConfig := AzureConfig{}
 
-	azureConfig.provider = providerConfig
+	azureConfig.Provider = providerConfig
 
 	authConfig := auth.Config{
 		Environment:            environments.Global,

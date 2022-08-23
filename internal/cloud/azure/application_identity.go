@@ -19,9 +19,9 @@ func (c *AzureConfig) NewApplicationClient(ctx context.Context) (ApplicationClie
 	if authorizerErr != nil {
 		return nil, authorizerErr
 	}
-	appAPI := msgraph.NewApplicationsClient(c.provider.TenantID.Value)
-	appAPI.BaseClient.Authorizer = authorizer
-	return appAPI, nil
+	appClient := msgraph.NewApplicationsClient(c.Provider.TenantID.Value)
+	appClient.BaseClient.Authorizer = authorizer
+	return appClient, nil
 }
 
 type ServicePrincipalsClient interface {
@@ -39,7 +39,7 @@ func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePr
 	if authorizerErr != nil {
 		return nil, authorizerErr
 	}
-	servicePrincipalsAPI := msgraph.NewServicePrincipalsClient(c.provider.TenantID.Value)
+	servicePrincipalsAPI := msgraph.NewServicePrincipalsClient(c.Provider.TenantID.Value)
 	servicePrincipalsAPI.BaseClient.Authorizer = authorizer
 	return servicePrincipalsAPI, nil
 }
