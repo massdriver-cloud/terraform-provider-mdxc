@@ -12,10 +12,17 @@ import (
 	"google.golang.org/api/option"
 )
 
-func createMockIamClient() (gcp.GCPResourceManagerIface, error) {
+func createMockPermissionClient() (gcp.GCPResourceManagerIface, error) {
 	ctx := context.Background()
 	apiService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := &cloudresourcemanager.Policy{}
+		resp := &cloudresourcemanager.Policy{
+			Bindings: []*cloudresourcemanager.Binding{
+				{
+					Role:    "roles/owner",
+					Members: []string{},
+				},
+			},
+		}
 		b, err := json.Marshal(resp)
 		if err != nil {
 			http.Error(w, "unable to marshal request: "+err.Error(), http.StatusBadRequest)
@@ -28,16 +35,17 @@ func createMockIamClient() (gcp.GCPResourceManagerIface, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return service.Projects, nil
 }
 
-func TestCreatePermission(t *testing.T) {
+func TestReadPermission(t *testing.T) {
 	ctx := context.Background()
 	config := &gcp.ApplicationPermissionConfig{
 		ID: "test",
 	}
-	client, _ := createMockIamClient()
-	_ = gcp.CreateApplicationPermission(ctx, config, client)
+	client, _ := createMockPermissionClient()
+	_ = gcp.ReadApplicationPermission(ctx, config, client)
 
 	// got := response.Email
 	// want := "test@PROJECT_ID.iam.gserviceaccount.com"

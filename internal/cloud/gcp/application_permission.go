@@ -3,10 +3,10 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"terraform-provider-mdxc/internal/cloud/gcp/oss"
 	"time"
 
 	"github.com/hashicorp/errwrap"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/option"
@@ -18,6 +18,12 @@ type ApplicationPermissionConfig struct {
 	Project          string
 	Role             string
 	Condition        string
+}
+
+type ApplicationPermissionResponse struct {
+	ID        string
+	Role      string
+	Condition string
 }
 
 type GCPResourceManagerIface interface {
@@ -39,6 +45,26 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 }
 
 func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, client GCPResourceManagerIface) error {
+	projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
+	if err != nil {
+		return err
+	}
+	binding := &cloudresourcemanager.Binding{}
+	for _, b := range projectPolicy.Bindings {
+		if b.Role == config.Role {
+			for _, member := range b.Members {
+				if member == fmt.Sprintf("serviceAccount:%s", config.ServiceAccountID) {
+					binding = b
+				}
+			}
+		}
+	}
+	if binding.Role == "" {
+		return fmt.Errorf("application permission does not exist")
+	}
+	config.Role = binding.Role
+	config.Condition = binding.Condition.Expression
+
 	return nil
 }
 
@@ -112,7 +138,6 @@ func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, p
 	if errDo != nil {
 		return nil, errDo
 	}
-	tflog.Debug(ctx, "got iam policy")
 
 	return policy, nil
 }
@@ -131,46 +156,30 @@ func saveProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, 
 func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
 	role := config.Role
 	member := config.ID
-	addedToExisting := false
-	for _, binding := range policy.Bindings {
-		if binding.Role == role {
-			// TODO: dedupe members
-			binding.Members = append(binding.Members, fmt.Sprintf("serviceAccount:%s", member))
-			// this doesn't feel quite right and needs testing / verification
-			// we don't want the condition to apply to all members
-			binding.Condition = &cloudresourcemanager.Expr{
-				Expression: config.Condition,
-			}
-			addedToExisting = true
-		}
-	}
-	if !addedToExisting {
-		policy.Bindings = append(policy.Bindings, &cloudresourcemanager.Binding{
-			Role: role,
-			Condition: &cloudresourcemanager.Expr{
-				Expression: config.Condition,
-			},
-			Members: []string{
-				fmt.Sprintf("serviceAccount:%s", member),
-			},
-		})
-	}
+
+	policy.Bindings = oss.AddBinding(policy.Bindings, &cloudresourcemanager.Binding{
+		Role: role,
+		Condition: &cloudresourcemanager.Expr{
+			Expression: config.Condition,
+		},
+		Members: []string{
+			fmt.Sprintf("serviceAccount:%s", member),
+		},
+	})
+
 	return nil
 }
 
 func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, policy *cloudresourcemanager.Policy) error {
 	role := config.Role
 	member := config.ID
-	for _, binding := range policy.Bindings {
-		if binding.Role == role {
-			membersToKeep := []string{}
-			for _, existingMember := range binding.Members {
-				if existingMember != fmt.Sprintf("serviceAccount:%s", member) {
-					membersToKeep = append(membersToKeep, existingMember)
-				}
-			}
-			binding.Members = membersToKeep
-		}
-	}
+
+	policy.Bindings = oss.RemoveBinding(policy.Bindings, &cloudresourcemanager.Binding{
+		Role: role,
+		Members: []string{
+			fmt.Sprintf("serviceAccount:%s", member),
+		},
+	})
+
 	return nil
 }

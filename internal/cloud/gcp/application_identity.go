@@ -5,7 +5,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
@@ -22,10 +21,12 @@ import (
 // 	// TODO func CreateServiceAccountIAMMember()
 
 type ApplicationIdentityConfig struct {
-	ID      string
-	Project string
-	Name    string
-	// ServiceAccountEmail string
+	ID                           string
+	Project                      string
+	Name                         string
+	ServiceAccountEmail          string
+	KubernetesNamspace           string
+	KubernetesServiceAccountName string
 }
 
 type GCPIamIface interface {
@@ -33,6 +34,7 @@ type GCPIamIface interface {
 	Get(email string) *iam.ProjectsServiceAccountsGetCall
 	Patch(email string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
 	Delete(email string) *iam.ProjectsServiceAccountsDeleteCall
+	GetIamPolicy(resource string) *iam.ProjectsServiceAccountsGetIamPolicyCall
 	SetIamPolicy(resource string, setiampolicyrequest *iam.SetIamPolicyRequest) *iam.ProjectsServiceAccountsSetIamPolicyCall
 }
 
@@ -45,7 +47,7 @@ func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (G
 	return service.Projects.ServiceAccounts, nil
 }
 
-func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: config.Name,
 		ServiceAccount: &iam.ServiceAccount{
@@ -54,13 +56,19 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	projectResourceName := fmt.Sprintf("projects/%s", config.Project)
-	serviceAccount, doErr := iamClient.Create(projectResourceName, request).Do()
+	serviceAccount, doErr := client.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
 
 	config.ID = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
+
+	if config.KubernetesNamspace != "" {
+		if errAddRole := addWorkloadIdentityRole(ctx, config, client); errAddRole != nil {
+			return errAddRole
+		}
+	}
 
 	return nil
 }
@@ -74,6 +82,7 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 
 	config.ID = serviceAccount.Email
 	config.Name = serviceAccount.DisplayName
+	config.Project = serviceAccount.ProjectId
 
 	return nil
 }
@@ -92,33 +101,34 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	return nil
 }
 
-func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
 	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
-	_, doErr := iamClient.Delete(resourceName).Do()
+	_, doErr := client.Delete(resourceName).Do()
 	return doErr
 }
 
-func addWorkloadIdentityRole(ctx context.Context, config *ApplicationPermissionConfig, iamClient GCPIamIface) error {
-	member := config.ID
-	namePrefix := strings.Split(member, "@")[0]
-	namespace := "default"
-	k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, namespace, namePrefix)
-	iamClient.SetIamPolicy(config.ID, &iam.SetIamPolicyRequest{
-		Policy: &iam.Policy{
-			Bindings: []*iam.Binding{
-				{
-					Role:    "roles/iam.workloadIdentityUser",
-					Members: []string{k8sEmail},
-				},
-			},
-		},
+// google_service_account_iam_member
+// sets an IAM policy for a GCP service account
+func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
+	k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, config.KubernetesNamspace, config.KubernetesServiceAccountName)
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	iamPolicy, errGet := client.GetIamPolicy(resourceName).Do()
+	if errGet != nil {
+		return errGet
+	}
+
+	// TODO: test if idempotent
+	iamPolicy.Bindings = append(iamPolicy.Bindings, &iam.Binding{
+		Role:    "roles/iam.workloadIdentityUser",
+		Members: []string{k8sEmail},
+	})
+
+	_, errSet := client.SetIamPolicy(config.ID, &iam.SetIamPolicyRequest{
+		Policy: iamPolicy,
 	}).Do()
-	// projectPolicy, err := getProjectIamPolicy(ctx, client, config.Project)
-	// if err != nil {
-	// 	return response, err
-	// }
-	// AddToPolicy(ctx, "roles/iam.workloadIdentityUser", k8sEmail, projectPolicy)
-	// saveProjectIamPolicy(ctx, client, config.Project, projectPolicy)
+	if errSet != nil {
+		return errSet
+	}
 
 	return nil
 }
