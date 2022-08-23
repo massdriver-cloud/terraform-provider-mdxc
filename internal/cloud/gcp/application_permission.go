@@ -3,7 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"terraform-provider-mdxc/internal/cloud/gcp/oss"
+	thirdparty "terraform-provider-mdxc/internal/cloud/gcp/thirdparty/terraform-google-provider"
 	"time"
 
 	"github.com/hashicorp/errwrap"
@@ -71,7 +71,7 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 			// https://github.com/hashicorp/terraform-provider-google/blob/2c3be0cf1f9c56231817a2e876fa63b1afdb46e2/google/iam.go#L103
 			break
 		}
-		if oss.IsConflictError(errSave) {
+		if thirdparty.IsConflictError(errSave) {
 			time.Sleep(backoff)
 			backoff = backoff * 2
 			if backoff > 30*time.Second {
@@ -115,7 +115,7 @@ func addToPolicy(ctx context.Context, config *ApplicationPermissionConfig, polic
 	role := config.Role
 	member := config.ServiceAccountID
 
-	policy.Bindings = oss.AddBinding(policy.Bindings, &cloudresourcemanager.Binding{
+	policy.Bindings = thirdparty.AddBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
 		Condition: &cloudresourcemanager.Expr{
 			Expression: config.Condition,
@@ -132,7 +132,7 @@ func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, 
 	role := config.Role
 	member := config.ServiceAccountID
 
-	policy.Bindings = oss.RemoveBinding(policy.Bindings, &cloudresourcemanager.Binding{
+	policy.Bindings = thirdparty.RemoveBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
 		Members: []string{
 			fmt.Sprintf("serviceAccount:%s", member),
