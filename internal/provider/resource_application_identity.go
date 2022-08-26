@@ -45,11 +45,21 @@ var azureApplicationIdentityInputs = tfsdk.Attribute{
 
 var gcpApplicationIdentityInputs = tfsdk.Attribute{
 	Optional:    true,
-	Description: "GCP service account onfiguration",
+	Description: "GCP service account configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
-		"placeholder": {
-			Type:     types.StringType,
-			Optional: true,
+		"kubernetes": {
+			Optional:    true,
+			Description: "Kubernetes configuration",
+			Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+				"namespace": {
+					Type:     types.StringType,
+					Required: true,
+				},
+				"service_account_name": {
+					Type:     types.StringType,
+					Required: true,
+				},
+			}),
 		},
 	}),
 }

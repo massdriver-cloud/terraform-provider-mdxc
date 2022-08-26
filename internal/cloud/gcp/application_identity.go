@@ -6,36 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
-
-// TODO: NewService(creds ... are they in ctx w/ GCP?) -> Service to pass to Create()
-// Pretty sure we'll need an oauth token like this (https://github.com/massdriver-cloud/satellite/blob/5e5cbba01d2563e7eb2316d3a9b71e007e109a75/src/handler/dns_zone/gcp.go#L20)
-// but haven't seen tf provider client auth yet...
-func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
-	service, err := iam.NewService(ctx, option.WithTokenSource(c.tokenSource))
-	if err != nil {
-		return nil, fmt.Errorf("iam.NewService: %v", err)
-	}
-
-	return service, nil
-}
-
-// func CreateServiceAccount(ctx context.Context, serviceAcctApi *iam.ProjectsServiceAccountsService, input *massdriver.AppIdentityInput) (*iam.ServiceAccount, error) {
-// 	request := &iam.CreateServiceAccountRequest{
-// 		AccountId: *input.Name,
-// 		ServiceAccount: &iam.ServiceAccount{
-// 			DisplayName: *input.Name,
-// 		},
-// 	}
-
-// 	//TODO: projectId must come from tfland
-// 	projectId := "foo"
-
-// 	return serviceAcctApi.Create("projects/"+projectId, request).Do()
-// }
 
 // // Create a massdriver AppIdentity in GCP.
 // func Create(ctx context.Context, api *iam.Service, input *massdriver.AppIdentityInput) (*massdriver.AppIdentityOutput, error) {
@@ -46,20 +20,34 @@ func (c *GCPConfig) NewIAMService(ctx context.Context) (*iam.Service, error) {
 // 	// TODO func CreateProjectIAMBinding()
 // 	// TODO func CreateServiceAccountIAMMember()
 
-// 	return &massdriver.AppIdentityOutput{
-// 		GcpServiceAccount: iam.ServiceAccount{Email: svcAcct.Email},
-// 	}, nil
-// }
-
 type ApplicationIdentityConfig struct {
-	ID                  string
-	Project             string
-	Name                string
-	ServiceAccountEmail string
+	ID                           string
+	Project                      string
+	Name                         string
+	ServiceAccountEmail          string
+	KubernetesNamspace           string
+	KubernetesServiceAccountName string
 }
 
-func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+type GCPIamIface interface {
+	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
+	Get(email string) *iam.ProjectsServiceAccountsGetCall
+	Patch(email string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
+	Delete(email string) *iam.ProjectsServiceAccountsDeleteCall
+	GetIamPolicy(resource string) *iam.ProjectsServiceAccountsGetIamPolicyCall
+	SetIamPolicy(resource string, setiampolicyrequest *iam.SetIamPolicyRequest) *iam.ProjectsServiceAccountsSetIamPolicyCall
+}
 
+func gcpIAMClientFactory(ctx context.Context, tokenSource oauth2.TokenSource) (GCPIamIface, error) {
+	service, err := iam.NewService(ctx, option.WithTokenSource(tokenSource))
+	if err != nil {
+		return nil, fmt.Errorf("iam.NewService: %v", err)
+	}
+
+	return service.Projects.ServiceAccounts, nil
+}
+
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
 	request := &iam.CreateServiceAccountRequest{
 		AccountId: config.Name,
 		ServiceAccount: &iam.ServiceAccount{
@@ -67,33 +55,81 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		},
 	}
 
-	projectId := config.Project
-
-	serviceAccountOutput, doErr := iamClient.Projects.ServiceAccounts.Create("projects/"+projectId, request).Do()
+	projectResourceName := fmt.Sprintf("projects/%s", config.Project)
+	serviceAccount, doErr := client.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
 	}
 
-	config.ID = serviceAccountOutput.Email
-	config.ServiceAccountEmail = serviceAccountOutput.Email
+	config.ID = serviceAccount.Email
+	config.ServiceAccountEmail = serviceAccount.Email
+	config.Name = serviceAccount.DisplayName
+
+	if config.KubernetesNamspace != "" {
+		if errAddRole := addWorkloadIdentityRole(ctx, config, client); errAddRole != nil {
+			return errAddRole
+		}
+	}
 
 	return nil
 }
 
-func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	serviceAccount, doErr := iamClient.Get(resourceName).Do()
+	if doErr != nil {
+		return doErr
+	}
+
+	config.Name = serviceAccount.DisplayName
+
 	return nil
 }
 
-func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
+func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient GCPIamIface) error {
+	request := &iam.PatchServiceAccountRequest{
+		ServiceAccount: &iam.ServiceAccount{
+			DisplayName: config.Name,
+		},
+	}
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	_, doErr := iamClient.Patch(resourceName, request).Do()
+	if doErr != nil {
+		return doErr
+	}
 	return nil
 }
 
-func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, iamClient *iam.Service) error {
-
-	name := "projects/" + config.Project + "/serviceAccounts/" + config.ID
-
-	tflog.Debug(ctx, "------------------------------------------------------------------"+name)
-
-	_, doErr := iamClient.Projects.ServiceAccounts.Delete(name).Do()
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	_, doErr := client.Delete(resourceName).Do()
 	return doErr
+}
+
+// google_service_account_iam_member
+// sets an IAM policy for a GCP service account
+func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityConfig, client GCPIamIface) error {
+	k8sEmail := fmt.Sprintf("%s.svc.id.goog[%s/%s]", config.Project, config.KubernetesNamspace, config.KubernetesServiceAccountName)
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, config.ID)
+	iamPolicy, errGet := client.GetIamPolicy(resourceName).Do()
+	if errGet != nil {
+		return errGet
+	}
+
+	// TODO: test if idempotent
+	iamPolicy.Bindings = append(iamPolicy.Bindings, &iam.Binding{
+		Role: "roles/iam.workloadIdentityUser",
+		Members: []string{
+			fmt.Sprintf("serviceAccount:%s", k8sEmail),
+		},
+	})
+
+	_, errSet := client.SetIamPolicy(resourceName, &iam.SetIamPolicyRequest{
+		Policy: iamPolicy,
+	}).Do()
+	if errSet != nil {
+		return errSet
+	}
+
+	return nil
 }

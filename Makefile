@@ -4,7 +4,7 @@ NAMESPACE=massdriver-cloud
 NAME=mdxc
 BINARY=terraform-provider-${NAME}
 VERSION=1.0.0
-OS_ARCHS= darwin_amd64 linux_amd64
+OS_ARCHS= darwin_amd64 linux_amd64 darwin_arm64
 
 default: install
 

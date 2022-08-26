@@ -1,41 +1,74 @@
 package gcp_test
 
-// func TestCreateServiceAccount(t *testing.T) {
-// 	appIdentityInput := massdriver.AppIdentityInput{
-// 		Name: aws.String("test"),
-// 	}
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"terraform-provider-mdxc/internal/cloud/gcp"
+	"testing"
 
-// 	ctx := context.Background()
-// 	iamSvc := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		createReq := iam.CreateServiceAccountRequest{}
+	"google.golang.org/api/iam/v1"
+	"google.golang.org/api/option"
+)
 
-// 		body, _ := io.ReadAll(r.Body)
-// 		json.Unmarshal([]byte(body), &createReq)
+func createMockIamClient() (gcp.GCPIamIface, error) {
+	ctx := context.Background()
+	apiService := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		project := strings.Split(r.URL.String(), "/")[3]
 
-// 		email := fmt.Sprintf("%s@PROJECT_ID.iam.gserviceaccount.com", createReq.AccountId)
-// 		resp := &iam.ServiceAccount{Email: email}
+		resp := &iam.ServiceAccount{
+			Email:       fmt.Sprintf("test-name-prefix@%s.iam.gserviceaccount.com", project),
+			DisplayName: "test-name-prefix",
+			ProjectId:   project,
+		}
 
-// 		b, err := json.Marshal(resp)
-// 		if err != nil {
-// 			http.Error(w, "unable to marshal request: "+err.Error(), http.StatusBadRequest)
-// 			return
-// 		}
-// 		w.Write(b)
-// 	}))
+		b, err := json.Marshal(resp)
+		if err != nil {
+			http.Error(w, "unable to marshal request: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		w.Write(b)
+	}))
 
-// 	defer iamSvc.Close()
-// 	svc, err := iam.NewService(ctx, option.WithoutAuthentication(), option.WithEndpoint(iamSvc.URL))
-// 	if err != nil {
-// 		t.Fatalf("unable to create client: %v", err)
-// 	}
+	service, err := iam.NewService(ctx, option.WithoutAuthentication(), option.WithEndpoint(apiService.URL))
+	if err != nil {
+		return nil, err
+	}
 
-// 	m := svc.Projects.ServiceAccounts
+	return service.Projects.ServiceAccounts, nil
+}
 
-// 	serviceAccount, _ := app_identity.CreateServiceAccount(context.TODO(), m, &appIdentityInput)
-// 	got := serviceAccount.Email
-// 	want := "test@PROJECT_ID.iam.gserviceaccount.com"
+func TestCreateIdentity(t *testing.T) {
+	ctx := context.Background()
+	config := &gcp.ApplicationIdentityConfig{
+		Name:    "test-name-prefix",
+		Project: "test-project",
+	}
+	client, _ := createMockIamClient()
+	_ = gcp.CreateApplicationIdentity(ctx, config, client)
 
-// 	if want != got {
-// 		t.Errorf("expect %v, got %v", want, got)
-// 	}
-// }
+	compare(t, config.ID, "test-name-prefix@test-project.iam.gserviceaccount.com")
+	compare(t, config.Name, "test-name-prefix")
+}
+
+func TestReadIdentity(t *testing.T) {
+	ctx := context.Background()
+	config := &gcp.ApplicationIdentityConfig{
+		ID:      "test-name-prefix@test-project.iam.gserviceaccount.com",
+		Project: "test-project",
+	}
+	client, _ := createMockIamClient()
+	_ = gcp.ReadApplicationIdentity(ctx, config, client)
+
+	compare(t, config.ID, "test-name-prefix@test-project.iam.gserviceaccount.com")
+	compare(t, config.Name, "test-name-prefix")
+}
+
+func compare(t *testing.T, got string, want string) {
+	if want != got {
+		t.Errorf("expect %v, got %v", want, got)
+	}
+}

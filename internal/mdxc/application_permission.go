@@ -4,6 +4,7 @@ import (
 	"context"
 	"terraform-provider-mdxc/internal/cloud/aws"
 	"terraform-provider-mdxc/internal/cloud/azure"
+	"terraform-provider-mdxc/internal/cloud/gcp"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,8 +29,8 @@ func (c *MDXCClient) CreateApplicationPermission(ctx context.Context, d *Applica
 		return runApplicationPermissionFunctionAWS(aws.CreateApplicationPermission, ctx, d, c.AWSConfig)
 	case "azure":
 		return runApplicationPermissionFunctionAzure(azure.CreateApplicationPermission, ctx, d, c.AzureConfig)
-		// case "gcp":
-		// 	return runApplicationPermissionFunctionGCP(gcp.CreateApplicationPermission, ctx, d, c.GCPConfig)
+	case "gcp":
+		return runApplicationPermissionFunctionGCP(gcp.CreateApplicationPermission, ctx, d, c.GCPConfig)
 	}
 	return diag.Diagnostics{diag.NewErrorDiagnostic("Cloud not supported", "Provider does not support specified cloud: "+c.Cloud)}
 }
@@ -40,8 +41,8 @@ func (c *MDXCClient) ReadApplicationPermission(ctx context.Context, d *Applicati
 		return runApplicationPermissionFunctionAWS(aws.ReadApplicationPermission, ctx, d, c.AWSConfig)
 	case "azure":
 		return runApplicationPermissionFunctionAzure(azure.ReadApplicationPermission, ctx, d, c.AzureConfig)
-		// case "gcp":
-		// 	return runApplicationPermissionFunctionGCP(gcp.ReadApplicationPermission, ctx, d, c.GCPConfig)
+	case "gcp":
+		return runApplicationPermissionFunctionGCP(gcp.ReadApplicationPermission, ctx, d, c.GCPConfig)
 	}
 	return diag.Diagnostics{diag.NewErrorDiagnostic("Cloud not supported", "Provider does not support specified cloud: "+c.Cloud)}
 }
@@ -52,8 +53,8 @@ func (c *MDXCClient) UpdateApplicationPermission(ctx context.Context, d *Applica
 		return runApplicationPermissionFunctionAWS(aws.UpdateApplicationPermission, ctx, d, c.AWSConfig)
 	case "azure":
 		return runApplicationPermissionFunctionAzure(azure.UpdateApplicationPermission, ctx, d, c.AzureConfig)
-		// case "gcp":
-		// 	return runApplicationPermissionFunctionGCP(gcp.UpdateApplicationPermission, ctx, d, c.GCPConfig)
+	case "gcp":
+		return runApplicationPermissionFunctionGCP(gcp.UpdateApplicationPermission, ctx, d, c.GCPConfig)
 	}
 	return diag.Diagnostics{diag.NewErrorDiagnostic("Cloud not supported", "Provider does not support specified cloud: "+c.Cloud)}
 }
@@ -64,8 +65,8 @@ func (c *MDXCClient) DeleteApplicationPermission(ctx context.Context, d *Applica
 		return runApplicationPermissionFunctionAWS(aws.DeleteApplicationPermission, ctx, d, c.AWSConfig)
 	case "azure":
 		return runApplicationPermissionFunctionAzure(azure.DeleteApplicationPermission, ctx, d, c.AzureConfig)
-		// case "gcp":
-		// 	return runApplicationPermissionFunctionGCP(gcp.DeleteApplicationPermission, ctx, d, c.GCPConfig)
+	case "gcp":
+		return runApplicationPermissionFunctionGCP(gcp.DeleteApplicationPermission, ctx, d, c.GCPConfig)
 	}
 	return diag.Diagnostics{diag.NewErrorDiagnostic("Cloud not supported", "Provider does not support specified cloud: "+c.Cloud)}
 }
@@ -156,43 +157,48 @@ func runApplicationPermissionFunctionAzure(function applicationPermissionFunctio
 }
 
 // // -------------- GCP --------------
-// type applicationPermissionFunctionGCP func(context.Context, *gcp.ApplicationPermissionConfig, *iam.Service) error
+type applicationPermissionFunctionGCP func(context.Context, *gcp.ApplicationPermissionConfig, gcp.GCPResourceManagerIface) error
 
-// func convertApplicationPermissionConfigTerraformToGCP(d *ApplicationPermissionData, a *gcp.ApplicationPermissionConfig, c *gcp.GCPConfig) {
-// 	a.ID = d.Id.Value
-// 	if d.GCPInput != nil {
-// 		a.RoleName = d.GCPInput.RoleName.Value
-// 		a.Condition = d.GCPInput.Condition.Value
-// 	}
-// }
+func convertApplicationPermissionConfigTerraformToGCP(d *ApplicationPermissionData, a *gcp.ApplicationPermissionConfig, c *gcp.GCPConfig) {
+	a.ID = d.Id.Value
+	a.Project = c.Provider.Project.Value
+	a.ServiceAccountID = d.ApplicationIdentityID.Value
+	if d.Permission != nil {
+		a.Role = d.Permission.RoleName.Value
+		a.Condition = d.Permission.Condition.Value
+	}
+}
 
-// func convertApplicationPermissionConfigGCPToTerraform(a *gcp.ApplicationPermissionConfig, d *ApplicationPermissionData) {
-// 	d.Id = types.String{Value: a.ID}
-// 	if d.GCPInput == nil {
-// 		d.GCPInput = &GCPApplicationPermissionInputData{}
-// 	}
-// 	d.AzureInput.RoleName = types.String{Value: a.RoleName}
-// 	d.AzureInput.Condition = types.String{Value: a.Condition}
-// }
+func convertApplicationPermissionConfigGCPToTerraform(a *gcp.ApplicationPermissionConfig, d *ApplicationPermissionData) {
+	d.Id = types.String{Value: a.ID}
+	if d.Permission == nil {
+		d.Permission = &ApplicationPermissionPermissionData{}
+	}
+	d.Permission.RoleName = types.String{Value: a.Role}
+	d.ApplicationIdentityID = types.String{Value: a.ServiceAccountID}
+	d.Permission.Condition = types.String{Value: a.Condition}
+}
 
-// func runApplicationPermissionFunctionGCP(function applicationPermissionFunctionGCP, ctx context.Context, d *ApplicationPermissionData, config *gcp.GCPConfig) diag.Diagnostics {
-// 	var diags diag.Diagnostics
-// 	iamClient, serviceErr := config.NewIAMService(ctx)
-// 	if serviceErr != nil {
-// 		diags.Append(
-// 			diag.NewErrorDiagnostic(serviceErr.Error(), ""),
-// 		)
-// 		return diags
-// 	}
-// 	cloudApplicationPermissionConfig := gcp.ApplicationPermissionConfig{}
-// 	convertApplicationPermissionConfigTerraformToGCP(d, &cloudApplicationPermissionConfig, config)
-// 	err := function(ctx, &cloudApplicationPermissionConfig, iamClient)
-// 	if err != nil {
-// 		diags.Append(
-// 			diag.NewErrorDiagnostic(err.Error(), ""),
-// 		)
-// 		return diags
-// 	}
-// 	convertApplicationPermissionConfigGCPToTerraform(&cloudApplicationPermissionConfig, d)
-// 	return diags
-// }
+func runApplicationPermissionFunctionGCP(function applicationPermissionFunctionGCP, ctx context.Context, d *ApplicationPermissionData, config *gcp.GCPConfig) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	iamClient, serviceErr := config.NewResourceManagerService(ctx, config.TokenSource)
+	if serviceErr != nil {
+		diags.Append(
+			diag.NewErrorDiagnostic(serviceErr.Error(), ""),
+		)
+		return diags
+	}
+
+	cloudApplicationPermissionConfig := gcp.ApplicationPermissionConfig{}
+	convertApplicationPermissionConfigTerraformToGCP(d, &cloudApplicationPermissionConfig, config)
+	err := function(ctx, &cloudApplicationPermissionConfig, iamClient)
+	if err != nil {
+		diags.Append(
+			diag.NewErrorDiagnostic(err.Error(), ""),
+		)
+		return diags
+	}
+	convertApplicationPermissionConfigGCPToTerraform(&cloudApplicationPermissionConfig, d)
+	return diags
+}
