@@ -147,7 +147,6 @@ func CreateApplicationPermission(ctx context.Context, config *ApplicationPermiss
 
 	// config.ID = *ra.ID
 
-	return nil
 }
 
 func ReadApplicationPermission(ctx context.Context, config *ApplicationPermissionConfig, raClient RoleAssignmentsClient, rdClient RoleDefinitionsClient) error {
