@@ -14,7 +14,7 @@ type AWSApplicationIdentityInputData struct {
 	AssumeRolePolicy types.String `tfsdk:"assume_role_policy"`
 }
 type GCPApplicationIdentityInputData struct {
-	Kubernetes GCPKubernetesIdentityInputData `tfsdk:"kubernetes"`
+	Kubernetes *GCPKubernetesIdentityInputData `tfsdk:"kubernetes"`
 }
 type GCPKubernetesIdentityInputData struct {
 	Namespace          types.String `tfsdk:"namespace"`
@@ -196,11 +196,14 @@ type applicationIdentityFunctionGCP func(context.Context, *gcp.ApplicationIdenti
 
 func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, a *gcp.ApplicationIdentityConfig, c *gcp.GCPConfig) {
 	a.ID = d.Id.Value
+	a.ServiceAccountEmail = d.Id.Value
 	a.Name = d.Name.Value
 	a.Project = c.Provider.Project.Value
 	if d.GCPInput != nil {
-		a.KubernetesNamspace = d.GCPInput.Kubernetes.Namespace.Value
-		a.KubernetesServiceAccountName = d.GCPInput.Kubernetes.ServiceAccountName.Value
+		if d.GCPInput.Kubernetes != nil {
+			a.KubernetesNamspace = d.GCPInput.Kubernetes.Namespace.Value
+			a.KubernetesServiceAccountName = d.GCPInput.Kubernetes.ServiceAccountName.Value
+		}
 	}
 	if d.GCPOutput != nil {
 	}
