@@ -112,6 +112,7 @@ type applicationPermissionFunctionAzure func(context.Context, *azure.Application
 
 func convertApplicationPermissionConfigTerraformToAzure(d *ApplicationPermissionData, a *azure.ApplicationPermissionConfig) {
 	a.ID = d.Id.Value
+	a.ServicePrincipalID = d.ApplicationIdentityID.Value
 	if d.Permission != nil {
 		a.RoleName = d.Permission.RoleName.Value
 		a.Scope = d.Permission.Scope.Value
@@ -120,6 +121,7 @@ func convertApplicationPermissionConfigTerraformToAzure(d *ApplicationPermission
 
 func convertApplicationPermissionConfigAzureToTerraform(a *azure.ApplicationPermissionConfig, d *ApplicationPermissionData) {
 	d.Id = types.String{Value: a.ID}
+	d.ApplicationIdentityID = types.String{Value: a.ServicePrincipalID}
 	if d.Permission == nil {
 		d.Permission = &ApplicationPermissionPermissionData{}
 	}
