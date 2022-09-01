@@ -91,7 +91,13 @@ func readModifyWriteWithBackoff(ctx context.Context, config *ApplicationPermissi
 
 // https://cloud.google.com/iam/docs/reference/rest/v1/projects.serviceAccounts/create
 func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, projectId string) (*cloudresourcemanager.Policy, error) {
-	getCall := service.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{})
+	getCall := service.GetIamPolicy(projectId, &cloudresourcemanager.GetIamPolicyRequest{
+		Options: &cloudresourcemanager.GetPolicyOptions{
+			// policies with any conditional role bindings must specify version 3.
+			// https://cloud.google.com/iam/docs/policies#versions
+			RequestedPolicyVersion: 3,
+		},
+	})
 	policy, errDo := getCall.Do()
 	if errDo != nil {
 		return nil, errDo
