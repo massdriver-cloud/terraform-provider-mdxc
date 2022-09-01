@@ -52,13 +52,13 @@ func (t ResourceApplicationPermissionType) GetSchema(ctx context.Context) (tfsdk
 						},
 						Validators: []tfsdk.AttributeValidator{
 							schemavalidator.ConflictsWith(
-								path.MatchRelative().AtParent().AtName("role_name"),
+								path.MatchRelative().AtParent().AtName("role"),
 								path.MatchRelative().AtParent().AtName("scope"),
 								path.MatchRelative().AtParent().AtName("condition"),
 							),
 						},
 					},
-					"role_name": {
+					"role": {
 						Type:        types.StringType,
 						Optional:    true,
 						Description: "The Azure or GCP built-in IAM role to bind to the application identity",
@@ -85,7 +85,7 @@ func (t ResourceApplicationPermissionType) GetSchema(ctx context.Context) (tfsdk
 								path.MatchRelative().AtParent().AtName("condition"),
 							),
 							schemavalidator.AlsoRequires(
-								path.MatchRelative().AtParent().AtName("role_name"),
+								path.MatchRelative().AtParent().AtName("role"),
 							),
 						},
 					},
@@ -102,7 +102,7 @@ func (t ResourceApplicationPermissionType) GetSchema(ctx context.Context) (tfsdk
 								path.MatchRelative().AtParent().AtName("scope"),
 							),
 							schemavalidator.AlsoRequires(
-								path.MatchRelative().AtParent().AtName("role_name"),
+								path.MatchRelative().AtParent().AtName("role"),
 							),
 						},
 					},

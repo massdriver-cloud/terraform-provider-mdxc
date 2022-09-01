@@ -12,7 +12,7 @@ import (
 
 type ApplicationPermissionPermissionData struct {
 	PolicyARN types.String `tfsdk:"policy_arn"`
-	RoleName  types.String `tfsdk:"role_name"`
+	Role      types.String `tfsdk:"role"`
 	Scope     types.String `tfsdk:"scope"`
 	Condition types.String `tfsdk:"condition"`
 }
@@ -113,7 +113,7 @@ type applicationPermissionFunctionAzure func(context.Context, *azure.Application
 func convertApplicationPermissionConfigTerraformToAzure(d *ApplicationPermissionData, a *azure.ApplicationPermissionConfig) {
 	a.ID = d.Id.Value
 	if d.Permission != nil {
-		a.RoleName = d.Permission.RoleName.Value
+		a.RoleName = d.Permission.Role.Value
 		a.Scope = d.Permission.Scope.Value
 	}
 }
@@ -123,7 +123,7 @@ func convertApplicationPermissionConfigAzureToTerraform(a *azure.ApplicationPerm
 	if d.Permission == nil {
 		d.Permission = &ApplicationPermissionPermissionData{}
 	}
-	d.Permission.RoleName = types.String{Value: a.RoleName}
+	d.Permission.Role = types.String{Value: a.RoleName}
 	d.Permission.Scope = types.String{Value: a.Scope}
 }
 
@@ -164,7 +164,7 @@ func convertApplicationPermissionConfigTerraformToGCP(d *ApplicationPermissionDa
 	a.Project = c.Provider.Project.Value
 	a.ServiceAccountID = d.ApplicationIdentityID.Value
 	if d.Permission != nil {
-		a.Role = d.Permission.RoleName.Value
+		a.Role = d.Permission.Role.Value
 		a.Condition = d.Permission.Condition.Value
 	}
 }
@@ -174,7 +174,7 @@ func convertApplicationPermissionConfigGCPToTerraform(a *gcp.ApplicationPermissi
 	if d.Permission == nil {
 		d.Permission = &ApplicationPermissionPermissionData{}
 	}
-	d.Permission.RoleName = types.String{Value: a.Role}
+	d.Permission.Role = types.String{Value: a.Role}
 	d.ApplicationIdentityID = types.String{Value: a.ServiceAccountID}
 	d.Permission.Condition = types.String{Value: a.Condition}
 }
