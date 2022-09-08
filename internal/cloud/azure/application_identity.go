@@ -114,7 +114,7 @@ func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	config.ID = ""
-	config.ApplicationObjectID = ""
+	config.ServicePrincipalObjectID = ""
 	config.ServicePrincipalClientID = ""
 	config.ServicePrincipalSecret = ""
 
