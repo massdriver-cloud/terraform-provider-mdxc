@@ -79,11 +79,11 @@ var azureApplicationIdentityOutputs = tfsdk.Attribute{
 	Computed:    true,
 	Description: "Azure application and service principal configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
-		"application_id": {
+		"service_principal_object_id": {
 			Type:     types.StringType,
 			Computed: true,
 		},
-		"service_principal_id": {
+		"service_principal_client_id": {
 			Type:     types.StringType,
 			Computed: true,
 		},

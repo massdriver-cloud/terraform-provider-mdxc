@@ -46,30 +46,31 @@ func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePr
 }
 
 type ApplicationIdentityConfig struct {
-	ID                     string
-	Name                   string
-	ApplicationID          string
-	ServicePrincipalID     string
-	ServicePrincipalSecret string
+	ID                       string
+	Name                     string
+	ApplicationObjectID      string
+	ServicePrincipalObjectID string
+	ServicePrincipalClientID string
+	ServicePrincipalSecret   string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
 	// The ID is the service principal ID, so technically theres a chance that last time the App was made
 	// but the SP was not. We need to check if the Application was made and skip creation if it was.
-	if config.ApplicationID == "" {
+	if config.ApplicationObjectID == "" {
 		app, _, appErr := appClient.Create(ctx, msgraph.Application{
 			DisplayName: &config.Name,
 		})
 		if appErr != nil {
 			return appErr
 		}
-		config.ApplicationID = *app.ID
+		config.ApplicationObjectID = *app.ID
 	}
 
 	// fetch the application to make sure it exists
-	app, _, err := appClient.Get(ctx, config.ApplicationID, odata.Query{})
+	app, _, err := appClient.Get(ctx, config.ApplicationObjectID, odata.Query{})
 	if err != nil {
-		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationID, err)
+		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationObjectID, err)
 	}
 
 	sp, _, spErr := spClient.Create(ctx, msgraph.ServicePrincipal{
@@ -78,13 +79,14 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	if spErr != nil {
 		return spErr
 	}
-	config.ServicePrincipalID = *sp.ID
-	config.ID = *sp.ID
+	config.ServicePrincipalObjectID = *sp.ID
+	config.ServicePrincipalClientID = *sp.AppId
+	config.ID = *sp.AppId
 
 	// fetch the service principal to make sure it exists
-	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalID, odata.Query{})
+	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalObjectID, odata.Query{})
 	if spCheckErr != nil {
-		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalID, spCheckErr)
+		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalClientID, spCheckErr)
 	}
 
 	// Technically the secret is only needed for Kubernetes until the support workload identity. Maybe we make this on a conditional?
@@ -106,14 +108,14 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	_, appErr := appClient.Delete(ctx, config.ApplicationID)
+	_, appErr := appClient.Delete(ctx, config.ApplicationObjectID)
 	if appErr != nil {
 		return appErr
 	}
 
 	config.ID = ""
-	config.ApplicationID = ""
-	config.ServicePrincipalID = ""
+	config.ApplicationObjectID = ""
+	config.ServicePrincipalClientID = ""
 	config.ServicePrincipalSecret = ""
 
 	return nil

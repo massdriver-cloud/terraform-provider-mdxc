@@ -28,9 +28,9 @@ type AWSApplicationIdentityOutputData struct {
 	IAMRoleARN types.String `tfsdk:"iam_role_arn"`
 }
 type AzureApplicationIdentityOutputData struct {
-	ApplicationID          types.String `tfsdk:"application_id"`
-	ServicePrincipalID     types.String `tfsdk:"service_principal_id"`
-	ServicePrincipalSecret types.String `tfsdk:"service_principal_secret"`
+	ServicePrincipalObjectID types.String `tfsdk:"service_principal_object_id"`
+	ServicePrincipalClientID types.String `tfsdk:"service_principal_client_id"`
+	ServicePrincipalSecret   types.String `tfsdk:"service_principal_secret"`
 }
 type GCPApplicationIdentityOutputData struct {
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
@@ -145,8 +145,8 @@ func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData
 	a.Name = d.Name.Value
 	a.ID = d.Id.Value
 	if d.AzureOutput != nil {
-		a.ApplicationID = d.AzureOutput.ApplicationID.Value
-		a.ServicePrincipalID = d.AzureOutput.ServicePrincipalID.Value
+		a.ServicePrincipalObjectID = d.AzureOutput.ServicePrincipalObjectID.Value
+		a.ServicePrincipalObjectID = d.AzureOutput.ServicePrincipalObjectID.Value
 		a.ServicePrincipalSecret = d.AzureOutput.ServicePrincipalSecret.Value
 	}
 }
@@ -157,8 +157,8 @@ func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdenti
 	if d.AzureOutput == nil {
 		d.AzureOutput = &AzureApplicationIdentityOutputData{}
 	}
-	d.AzureOutput.ApplicationID = types.String{Value: a.ApplicationID}
-	d.AzureOutput.ServicePrincipalID = types.String{Value: a.ServicePrincipalID}
+	d.AzureOutput.ServicePrincipalObjectID = types.String{Value: a.ServicePrincipalObjectID}
+	d.AzureOutput.ServicePrincipalObjectID = types.String{Value: a.ServicePrincipalObjectID}
 	d.AzureOutput.ServicePrincipalSecret = types.String{Value: a.ServicePrincipalSecret}
 }
 
