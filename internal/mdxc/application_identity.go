@@ -146,6 +146,7 @@ func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData
 	a.Name = d.Name.Value
 	a.ID = d.Id.Value
 	if d.AzureOutput != nil {
+		a.ApplicationID = d.AzureOutput.ApplicationID.Value
 		a.ServicePrincipalClientID = d.AzureOutput.ServicePrincipalClientID.Value
 		a.ServicePrincipalID = d.AzureOutput.ServicePrincipalID.Value
 		a.ServicePrincipalSecret = d.AzureOutput.ServicePrincipalSecret.Value
@@ -158,6 +159,7 @@ func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdenti
 	if d.AzureOutput == nil {
 		d.AzureOutput = &AzureApplicationIdentityOutputData{}
 	}
+	d.AzureOutput.ApplicationID = types.String{Value: a.ApplicationID}
 	d.AzureOutput.ServicePrincipalID = types.String{Value: a.ServicePrincipalID}
 	d.AzureOutput.ServicePrincipalClientID = types.String{Value: a.ServicePrincipalClientID}
 	d.AzureOutput.ServicePrincipalSecret = types.String{Value: a.ServicePrincipalSecret}
