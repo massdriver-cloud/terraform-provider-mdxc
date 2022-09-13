@@ -87,6 +87,10 @@ var azureApplicationIdentityOutputs = tfsdk.Attribute{
 			Type:     types.StringType,
 			Computed: true,
 		},
+		"service_principal_client_id": {
+			Type:     types.StringType,
+			Computed: true,
+		},
 		"service_principal_secret": {
 			Type:     types.StringType,
 			Computed: true,

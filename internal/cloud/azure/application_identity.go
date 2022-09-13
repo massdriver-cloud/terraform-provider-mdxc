@@ -46,11 +46,12 @@ func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePr
 }
 
 type ApplicationIdentityConfig struct {
-	ID                     string
-	Name                   string
-	ApplicationID          string
-	ServicePrincipalID     string
-	ServicePrincipalSecret string
+	ID                       string
+	Name                     string
+	ApplicationID            string
+	ServicePrincipalID       string
+	ServicePrincipalClientID string
+	ServicePrincipalSecret   string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
@@ -79,6 +80,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		return spErr
 	}
 	config.ServicePrincipalID = *sp.ID
+	config.ServicePrincipalClientID = *sp.AppId
 	config.ID = *sp.ID
 
 	// fetch the service principal to make sure it exists
@@ -114,6 +116,7 @@ func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	config.ID = ""
 	config.ApplicationID = ""
 	config.ServicePrincipalID = ""
+	config.ServicePrincipalClientID = ""
 	config.ServicePrincipalSecret = ""
 
 	return nil

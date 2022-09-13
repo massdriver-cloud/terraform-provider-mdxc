@@ -19,5 +19,3 @@ A utility data source to get the provider's currently configured cloud
 
 - `cloud` (String) The currently configured cloud (aws, gcp, azure, etc)
 - `id` (String) The ID of the underlying cloud scope. For AWS, it will be the account ID, for GCP it will be the project ID, for Azure it will be the subcription ID.
-
-
