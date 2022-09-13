@@ -48,8 +48,8 @@ func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePr
 type ApplicationIdentityConfig struct {
 	ID                       string
 	Name                     string
-	ApplicationObjectID      string
-	ServicePrincipalObjectID string
+	ApplicationID            string
+	ServicePrincipalID       string
 	ServicePrincipalClientID string
 	ServicePrincipalSecret   string
 }
@@ -57,20 +57,20 @@ type ApplicationIdentityConfig struct {
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
 	// The ID is the service principal ID, so technically theres a chance that last time the App was made
 	// but the SP was not. We need to check if the Application was made and skip creation if it was.
-	if config.ApplicationObjectID == "" {
+	if config.ApplicationID == "" {
 		app, _, appErr := appClient.Create(ctx, msgraph.Application{
 			DisplayName: &config.Name,
 		})
 		if appErr != nil {
 			return appErr
 		}
-		config.ApplicationObjectID = *app.ID
+		config.ApplicationID = *app.ID
 	}
 
 	// fetch the application to make sure it exists
-	app, _, err := appClient.Get(ctx, config.ApplicationObjectID, odata.Query{})
+	app, _, err := appClient.Get(ctx, config.ApplicationID, odata.Query{})
 	if err != nil {
-		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationObjectID, err)
+		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationID, err)
 	}
 
 	sp, _, spErr := spClient.Create(ctx, msgraph.ServicePrincipal{
@@ -79,12 +79,12 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	if spErr != nil {
 		return spErr
 	}
-	config.ServicePrincipalObjectID = *sp.ID
+	config.ServicePrincipalID = *sp.ID
 	config.ServicePrincipalClientID = *sp.AppId
-	config.ID = *sp.AppId
+	config.ID = *sp.ID
 
 	// fetch the service principal to make sure it exists
-	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalObjectID, odata.Query{})
+	_, _, spCheckErr := spClient.Get(ctx, config.ID, odata.Query{})
 	if spCheckErr != nil {
 		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalClientID, spCheckErr)
 	}
@@ -108,14 +108,14 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	_, appErr := appClient.Delete(ctx, config.ApplicationObjectID)
+	_, appErr := appClient.Delete(ctx, config.ApplicationID)
 	if appErr != nil {
 		return appErr
 	}
 
 	config.ID = ""
-	config.ApplicationObjectID = ""
-	config.ServicePrincipalObjectID = ""
+	config.ApplicationID = ""
+	config.ServicePrincipalID = ""
 	config.ServicePrincipalClientID = ""
 	config.ServicePrincipalSecret = ""
 
