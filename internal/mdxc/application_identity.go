@@ -28,6 +28,7 @@ type AWSApplicationIdentityOutputData struct {
 	IAMRoleARN types.String `tfsdk:"iam_role_arn"`
 }
 type AzureApplicationIdentityOutputData struct {
+	ApplicationID            types.String `tfsdk:"application_id"`
 	ServicePrincipalID       types.String `tfsdk:"service_principal_id"`
 	ServicePrincipalClientID types.String `tfsdk:"service_principal_client_id"`
 	ServicePrincipalSecret   types.String `tfsdk:"service_principal_secret"`
