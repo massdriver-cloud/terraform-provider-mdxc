@@ -84,9 +84,9 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	config.ID = *sp.ID
 
 	// fetch the service principal to make sure it exists
-	_, _, spCheckErr := spClient.Get(ctx, config.ID, odata.Query{})
+	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalID, odata.Query{})
 	if spCheckErr != nil {
-		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ID, spCheckErr)
+		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalID, spCheckErr)
 	}
 
 	// Technically the secret is only needed for Kubernetes until the support workload identity. Maybe we make this on a conditional?
