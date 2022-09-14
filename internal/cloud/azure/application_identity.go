@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/manicminer/hamilton/msgraph"
 	"github.com/manicminer/hamilton/odata"
@@ -45,22 +46,32 @@ func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePr
 }
 
 type ApplicationIdentityConfig struct {
-	ID            string
-	Name          string
-	ApplicationID string
-	ClientID      string
-	ClientSecret  string
+	ID                       string
+	Name                     string
+	ApplicationID            string
+	ServicePrincipalID       string
+	ServicePrincipalClientID string
+	ServicePrincipalSecret   string
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	app, _, appErr := appClient.Create(ctx, msgraph.Application{
-		DisplayName: &config.Name,
-	})
-	if appErr != nil {
-		return appErr
+	// The ID is the service principal ID, so technically theres a chance that last time the App was made
+	// but the SP was not. We need to check if the Application was made and skip creation if it was.
+	if config.ApplicationID == "" {
+		app, _, appErr := appClient.Create(ctx, msgraph.Application{
+			DisplayName: &config.Name,
+		})
+		if appErr != nil {
+			return appErr
+		}
+		config.ApplicationID = *app.ID
 	}
-	config.ApplicationID = *app.ID
-	config.ID = *app.ID
+
+	// fetch the application to make sure it exists
+	app, _, err := appClient.Get(ctx, config.ApplicationID, odata.Query{})
+	if err != nil {
+		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationID, err)
+	}
 
 	sp, _, spErr := spClient.Create(ctx, msgraph.ServicePrincipal{
 		AppId: app.AppId,
@@ -68,15 +79,22 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	if spErr != nil {
 		return spErr
 	}
-	config.ClientID = *sp.ID
+	config.ServicePrincipalID = *sp.ID
+	config.ServicePrincipalClientID = *sp.AppId
+	config.ID = *sp.ID
 
-	spSecret, _, secretErr := spClient.AddPassword(ctx, *sp.ID, msgraph.PasswordCredential{
-		KeyId: sp.AppId,
-	})
+	// fetch the service principal to make sure it exists
+	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalID, odata.Query{})
+	if spCheckErr != nil {
+		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalID, spCheckErr)
+	}
+
+	// Technically the secret is only needed for Kubernetes until the support workload identity. Maybe we make this on a conditional?
+	spSecret, _, secretErr := spClient.AddPassword(ctx, *sp.ID, msgraph.PasswordCredential{})
 	if secretErr != nil {
 		return secretErr
 	}
-	config.ClientSecret = *spSecret.SecretText
+	config.ServicePrincipalSecret = *spSecret.SecretText
 
 	return nil
 }
@@ -90,15 +108,16 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	_, appErr := appClient.Delete(ctx, config.ID)
+	_, appErr := appClient.Delete(ctx, config.ApplicationID)
 	if appErr != nil {
 		return appErr
 	}
 
 	config.ID = ""
 	config.ApplicationID = ""
-	config.ClientID = ""
-	config.ClientSecret = ""
+	config.ServicePrincipalID = ""
+	config.ServicePrincipalClientID = ""
+	config.ServicePrincipalSecret = ""
 
 	return nil
 }

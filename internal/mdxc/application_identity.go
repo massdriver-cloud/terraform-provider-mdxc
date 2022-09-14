@@ -28,9 +28,10 @@ type AWSApplicationIdentityOutputData struct {
 	IAMRoleARN types.String `tfsdk:"iam_role_arn"`
 }
 type AzureApplicationIdentityOutputData struct {
-	ApplicationID types.String `tfsdk:"application_id"`
-	ClientID      types.String `tfsdk:"client_id"`
-	ClientSecret  types.String `tfsdk:"client_secret"`
+	ApplicationID            types.String `tfsdk:"application_id"`
+	ServicePrincipalID       types.String `tfsdk:"service_principal_id"`
+	ServicePrincipalClientID types.String `tfsdk:"service_principal_client_id"`
+	ServicePrincipalSecret   types.String `tfsdk:"service_principal_secret"`
 }
 type GCPApplicationIdentityOutputData struct {
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
@@ -146,8 +147,9 @@ func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData
 	a.ID = d.Id.Value
 	if d.AzureOutput != nil {
 		a.ApplicationID = d.AzureOutput.ApplicationID.Value
-		a.ClientID = d.AzureOutput.ClientID.Value
-		a.ClientSecret = d.AzureOutput.ClientSecret.Value
+		a.ServicePrincipalClientID = d.AzureOutput.ServicePrincipalClientID.Value
+		a.ServicePrincipalID = d.AzureOutput.ServicePrincipalID.Value
+		a.ServicePrincipalSecret = d.AzureOutput.ServicePrincipalSecret.Value
 	}
 }
 
@@ -158,8 +160,9 @@ func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdenti
 		d.AzureOutput = &AzureApplicationIdentityOutputData{}
 	}
 	d.AzureOutput.ApplicationID = types.String{Value: a.ApplicationID}
-	d.AzureOutput.ClientID = types.String{Value: a.ClientID}
-	d.AzureOutput.ClientSecret = types.String{Value: a.ClientSecret}
+	d.AzureOutput.ServicePrincipalID = types.String{Value: a.ServicePrincipalID}
+	d.AzureOutput.ServicePrincipalClientID = types.String{Value: a.ServicePrincipalClientID}
+	d.AzureOutput.ServicePrincipalSecret = types.String{Value: a.ServicePrincipalSecret}
 }
 
 func runApplicationIdentityFunctionAzure(function applicationIdentityFunctionAzure, ctx context.Context, d *ApplicationIdentityData, config *azure.AzureConfig) diag.Diagnostics {
