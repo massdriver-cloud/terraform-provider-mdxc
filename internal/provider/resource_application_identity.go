@@ -20,6 +20,8 @@ var _ resource.ResourceWithImportState = ResourceApplicationIdentity{}
 
 type ResourceApplicationIdentityType struct{}
 
+// https://github.com/hashicorp/terraform-provider-aws/pull/23060
+// https://github.com/hashicorp/terraform-provider-aws/blob/main/internal/verify/json.go
 var awsApplicationIdentityInputs = tfsdk.Attribute{
 	Optional:    true,
 	Description: "AWS IAM role configuration",
