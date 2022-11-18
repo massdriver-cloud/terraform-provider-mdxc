@@ -5,6 +5,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"golang.org/x/oauth2"
 	"google.golang.org/api/iam/v1"
@@ -31,7 +32,7 @@ type ApplicationIdentityConfig struct {
 
 type GCPIamIface interface {
 	Create(name string, createserviceaccountrequest *iam.CreateServiceAccountRequest) *iam.ProjectsServiceAccountsCreateCall
-	Get(email string) *iam.ProjectsServiceAccountsGetCall
+	Get(id string) *iam.ProjectsServiceAccountsGetCall
 	Patch(email string, patchserviceaccountrequest *iam.PatchServiceAccountRequest) *iam.ProjectsServiceAccountsPatchCall
 	Delete(email string) *iam.ProjectsServiceAccountsDeleteCall
 	GetIamPolicy(resource string) *iam.ProjectsServiceAccountsGetIamPolicyCall
@@ -59,6 +60,14 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	serviceAccount, doErr := client.Create(projectResourceName, request).Do()
 	if doErr != nil {
 		return doErr
+	}
+	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, serviceAccount.Email)
+	err := retry(5, time.Second, func() (operr error) {
+		_, errGet := client.Get(resourceName).Do()
+		return errGet
+	})
+	if err != nil {
+		return err
 	}
 
 	config.ID = serviceAccount.Email
