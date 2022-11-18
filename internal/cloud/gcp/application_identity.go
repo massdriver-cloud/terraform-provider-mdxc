@@ -61,9 +61,9 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	if doErr != nil {
 		return doErr
 	}
-	resourceName := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, serviceAccount.Email)
+	resourceID := fmt.Sprintf("projects/%s/serviceAccounts/%s", config.Project, serviceAccount.Email)
 	err := retry(5, time.Second, func() (operr error) {
-		_, errGet := client.Get(resourceName).Do()
+		_, errGet := client.Get(resourceID).Do()
 		return errGet
 	})
 	if err != nil {
