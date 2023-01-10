@@ -17,12 +17,17 @@ type AzureProviderConfig struct {
 }
 
 type AzureConfig struct {
-	Provider   *AzureProviderConfig
-	authConfig *auth.Config
+	Provider                              *AzureProviderConfig
+	authConfig                            *auth.Config
+	NewManagedIdentityClient              func(ctx context.Context, config *AzureProviderConfig) (ManagedIdentityClient, error)
+	NewFederatedIdentityCredentialsClient func(ctx context.Context, config *AzureProviderConfig) (FederatedIdentityCredentialClient, error)
 }
 
 func Initialize(ctx context.Context, providerConfig *AzureProviderConfig) (*AzureConfig, error) {
-	azureConfig := AzureConfig{}
+	azureConfig := AzureConfig{
+		NewManagedIdentityClient:              newManagedIdentityClientFactory,
+		NewFederatedIdentityCredentialsClient: newFederatedIdentityCredentialClientFactory,
+	}
 
 	azureConfig.Provider = providerConfig
 

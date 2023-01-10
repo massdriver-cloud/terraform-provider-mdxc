@@ -140,53 +140,41 @@ func runApplicationIdentityFunctionAWS(function applicationIdentityFunctionAWS, 
 }
 
 // -------------- Azure --------------
-type applicationIdentityFunctionAzure func(context.Context, *azure.ApplicationIdentityConfig, azure.ApplicationClient, azure.ServicePrincipalsClient) error
+type applicationIdentityFunctionAzure func(context.Context, *azure.ApplicationIdentityConfig, azure.ManagedIdentityClient, azure.FederatedIdentityCredentialClient) error
 
 func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData, a *azure.ApplicationIdentityConfig) {
 	a.Name = d.Name.Value
 	a.ID = d.Id.Value
-	if d.AzureOutput != nil {
-		a.ApplicationID = d.AzureOutput.ApplicationID.Value
-		a.ServicePrincipalClientID = d.AzureOutput.ServicePrincipalClientID.Value
-		a.ServicePrincipalID = d.AzureOutput.ServicePrincipalID.Value
-		a.ServicePrincipalSecret = d.AzureOutput.ServicePrincipalSecret.Value
-	}
 }
 
 func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdentityConfig, d *ApplicationIdentityData) {
 	d.Name = types.String{Value: a.Name}
 	d.Id = types.String{Value: a.ID}
-	if d.AzureOutput == nil {
-		d.AzureOutput = &AzureApplicationIdentityOutputData{}
-	}
-	d.AzureOutput.ApplicationID = types.String{Value: a.ApplicationID}
-	d.AzureOutput.ServicePrincipalID = types.String{Value: a.ServicePrincipalID}
-	d.AzureOutput.ServicePrincipalClientID = types.String{Value: a.ServicePrincipalClientID}
-	d.AzureOutput.ServicePrincipalSecret = types.String{Value: a.ServicePrincipalSecret}
 }
 
 func runApplicationIdentityFunctionAzure(function applicationIdentityFunctionAzure, ctx context.Context, d *ApplicationIdentityData, config *azure.AzureConfig) diag.Diagnostics {
 	var diags diag.Diagnostics
-	appClient, appErr := config.NewApplicationClient(ctx)
-	if appErr != nil {
-		diags.Append(
-			diag.NewErrorDiagnostic(appErr.Error(), ""),
-		)
-		return diags
-	}
-	spClient, spErr := config.NewServicePrincipalsClient(ctx)
-	if spErr != nil {
-		diags.Append(
-			diag.NewErrorDiagnostic(spErr.Error(), ""),
-		)
-		return diags
-	}
-	cloudApplicationIdentityConfig := azure.ApplicationIdentityConfig{}
-	convertApplicationIdentityConfigTerraformToAzure(d, &cloudApplicationIdentityConfig)
-	err := function(ctx, &cloudApplicationIdentityConfig, appClient, spClient)
+	client, err := config.NewManagedIdentityClient(ctx, config.Provider)
 	if err != nil {
 		diags.Append(
 			diag.NewErrorDiagnostic(err.Error(), ""),
+		)
+		return diags
+	}
+	fedClient, errFed := config.NewFederatedIdentityCredentialsClient(ctx, config.Provider)
+	if errFed != nil {
+		diags.Append(
+			diag.NewErrorDiagnostic(err.Error(), ""),
+		)
+		return diags
+	}
+
+	cloudApplicationIdentityConfig := azure.ApplicationIdentityConfig{}
+	convertApplicationIdentityConfigTerraformToAzure(d, &cloudApplicationIdentityConfig)
+	errRunFunc := function(ctx, &cloudApplicationIdentityConfig, client, fedClient)
+	if errRunFunc != nil {
+		diags.Append(
+			diag.NewErrorDiagnostic(errRunFunc.Error(), ""),
 		)
 		return diags
 	}
