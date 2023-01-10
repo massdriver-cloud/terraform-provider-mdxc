@@ -2,122 +2,121 @@ package azure
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/manicminer/hamilton/msgraph"
-	"github.com/manicminer/hamilton/odata"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 )
 
-type ApplicationClient interface {
-	Create(ctx context.Context, application msgraph.Application) (*msgraph.Application, int, error)
-	Get(ctx context.Context, id string, query odata.Query) (*msgraph.Application, int, error)
-	Update(ctx context.Context, application msgraph.Application) (int, error)
-	Delete(ctx context.Context, id string) (int, error)
+type ManagedIdentityClient interface {
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, parameters armmsi.Identity, options *armmsi.UserAssignedIdentitiesClientCreateOrUpdateOptions) (armmsi.UserAssignedIdentitiesClientCreateOrUpdateResponse, error)
+	Get(ctx context.Context, resourceGroupName string, resourceName string, options *armmsi.UserAssignedIdentitiesClientGetOptions) (armmsi.UserAssignedIdentitiesClientGetResponse, error)
+	Delete(ctx context.Context, resourceGroupName string, resourceName string, options *armmsi.UserAssignedIdentitiesClientDeleteOptions) (armmsi.UserAssignedIdentitiesClientDeleteResponse, error)
 }
 
-func (c *AzureConfig) NewApplicationClient(ctx context.Context) (ApplicationClient, error) {
-	authorizer, authorizerErr := c.authConfig.NewAuthorizer(ctx, c.authConfig.Environment.MsGraph)
-	if authorizerErr != nil {
-		return nil, authorizerErr
-	}
-	appClient := msgraph.NewApplicationsClient(c.Provider.TenantID.Value)
-	appClient.BaseClient.Authorizer = authorizer
-	return appClient, nil
-}
-
-type ServicePrincipalsClient interface {
-	Create(ctx context.Context, servicePrincipal msgraph.ServicePrincipal) (*msgraph.ServicePrincipal, int, error)
-	Get(ctx context.Context, id string, query odata.Query) (*msgraph.ServicePrincipal, int, error)
-	Update(ctx context.Context, servicePrincipal msgraph.ServicePrincipal) (int, error)
-	Delete(ctx context.Context, id string) (int, error)
-
-	AddPassword(ctx context.Context, servicePrincipalId string, passwordCredential msgraph.PasswordCredential) (*msgraph.PasswordCredential, int, error)
-	RemovePassword(ctx context.Context, servicePrincipalId string, keyId string) (int, error)
-}
-
-func (c *AzureConfig) NewServicePrincipalsClient(ctx context.Context) (ServicePrincipalsClient, error) {
-	authorizer, authorizerErr := c.authConfig.NewAuthorizer(ctx, c.authConfig.Environment.MsGraph)
-	if authorizerErr != nil {
-		return nil, authorizerErr
-	}
-	servicePrincipalsAPI := msgraph.NewServicePrincipalsClient(c.Provider.TenantID.Value)
-	servicePrincipalsAPI.BaseClient.Authorizer = authorizer
-	return servicePrincipalsAPI, nil
+type FederatedIdentityCredentialClient interface {
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, federatedIdentityCredentialResourceName string, parameters armmsi.FederatedIdentityCredential, options *armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions) (armmsi.FederatedIdentityCredentialsClientCreateOrUpdateResponse, error)
 }
 
 type ApplicationIdentityConfig struct {
-	ID                       string
-	Name                     string
-	ApplicationID            string
-	ServicePrincipalID       string
-	ServicePrincipalClientID string
-	ServicePrincipalSecret   string
+	// READ-ONLY; Fully qualified resource ID for the resource.
+	// /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
+	ID                 string
+	Name               string
+	KubernetesNamspace string
 }
 
-func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	// The ID is the service principal ID, so technically theres a chance that last time the App was made
-	// but the SP was not. We need to check if the Application was made and skip creation if it was.
-	if config.ApplicationID == "" {
-		app, _, appErr := appClient.Create(ctx, msgraph.Application{
-			DisplayName: &config.Name,
-		})
-		if appErr != nil {
-			return appErr
-		}
-		config.ApplicationID = *app.ID
-	}
-
-	// fetch the application to make sure it exists
-	app, _, err := appClient.Get(ctx, config.ApplicationID, odata.Query{})
+func newManagedIdentityClientFactory(ctx context.Context, config *AzureProviderConfig) (ManagedIdentityClient, error) {
+	cred, err := azidentity.NewClientSecretCredential(config.TenantID.Value, config.ClientID.Value, config.ClientSecret.Value, nil)
 	if err != nil {
-		return fmt.Errorf("error retrieving Application with object ID %v: %w", config.ApplicationID, err)
+		return nil, err
 	}
 
-	sp, _, spErr := spClient.Create(ctx, msgraph.ServicePrincipal{
-		AppId: app.AppId,
-	})
-	if spErr != nil {
-		return spErr
-	}
-	config.ServicePrincipalID = *sp.ID
-	config.ServicePrincipalClientID = *sp.AppId
-	config.ID = *sp.ID
-
-	// fetch the service principal to make sure it exists
-	_, _, spCheckErr := spClient.Get(ctx, config.ServicePrincipalID, odata.Query{})
-	if spCheckErr != nil {
-		return fmt.Errorf("error retrieving Service Principal with ID %v: %w", config.ServicePrincipalID, spCheckErr)
+	client, errClient := armmsi.NewUserAssignedIdentitiesClient(config.SubscriptionID.Value, cred, nil)
+	if errClient != nil {
+		return nil, errClient
 	}
 
-	// Technically the secret is only needed for Kubernetes until the support workload identity. Maybe we make this on a conditional?
-	spSecret, _, secretErr := spClient.AddPassword(ctx, *sp.ID, msgraph.PasswordCredential{})
-	if secretErr != nil {
-		return secretErr
-	}
-	config.ServicePrincipalSecret = *spSecret.SecretText
+	return client, nil
+}
 
+func newFederatedIdentityCredentialClientFactory(ctx context.Context, config *AzureProviderConfig) (FederatedIdentityCredentialClient, error) {
+	cred, err := azidentity.NewClientSecretCredential(config.TenantID.Value, config.ClientID.Value, config.ClientSecret.Value, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client, errClient := armmsi.NewFederatedIdentityCredentialsClient(config.SubscriptionID.Value, cred, nil)
+	if errClient != nil {
+		return nil, errClient
+	}
+
+	return client, nil
+}
+
+func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
+	res, _ := client.CreateOrUpdate(ctx,
+		"rgName",
+		config.Name,
+		armmsi.Identity{
+			Location: to.Ptr("eastus"),
+			// Tags: map[string]*string{
+			// 	"key1": to.Ptr("value1"),
+			// 	"key2": to.Ptr("value2"),
+			// },
+		},
+		nil,
+	)
+
+	config.ID = *res.ID
+
+	if config.KubernetesNamspace != "" {
+		if errAddRole := addWorkloadIdentityRole(ctx, config, fedClient); errAddRole != nil {
+			return errAddRole
+		}
+	}
 	return nil
 }
 
-func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
+func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
 	return nil
 }
 
-func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
+func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
 	return nil
 }
 
-func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, appClient ApplicationClient, spClient ServicePrincipalsClient) error {
-	_, appErr := appClient.Delete(ctx, config.ApplicationID)
-	if appErr != nil {
-		return appErr
+func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
+	// We can use the name or get the name from the ID, which is the full resource ID
+	_, err := client.Delete(ctx, "resource-group", config.Name, nil)
+	if err != nil {
+		return err
 	}
 
 	config.ID = ""
-	config.ApplicationID = ""
-	config.ServicePrincipalID = ""
-	config.ServicePrincipalClientID = ""
-	config.ServicePrincipalSecret = ""
 
+	return nil
+}
+
+func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityConfig, client FederatedIdentityCredentialClient) error {
+	res, err := client.CreateOrUpdate(ctx,
+		"rgName",
+		"resourceName",
+		"ficResourceName",
+		armmsi.FederatedIdentityCredential{
+			Properties: &armmsi.FederatedIdentityCredentialProperties{
+				Audiences: []*string{
+					to.Ptr("api://AzureADTokenExchange")},
+				// TODO: need the issuer url from the k8s cluster
+				Issuer: to.Ptr("https://oidc.prod-aks.azure.com/IssuerGUID"),
+				// k8s service account
+				Subject: to.Ptr("system:serviceaccount:ns:svcaccount"),
+			},
+		},
+		nil)
+	if err != nil {
+		return err
+	}
+	config.KubernetesNamspace = *res.Name
 	return nil
 }
