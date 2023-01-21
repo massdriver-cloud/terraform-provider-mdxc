@@ -22,12 +22,14 @@ type FederatedIdentityCredentialClient interface {
 type ApplicationIdentityConfig struct {
 	// READ-ONLY; Fully qualified resource ID for the resource.
 	// /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
-	ID                 string
-	Name               string
-	Location           string
-	ResourceGroupName  string
-	KubernetesNamspace string
-	KubernetesOIDCURL  string
+	ID                           string
+	Name                         string
+	ManagedIdentityClientID      string
+	Location                     string
+	ResourceGroupName            string
+	KubernetesNamspace           string
+	KubernetesServiceAccountName string
+	KubernetesOIDCURL            string
 }
 
 func newManagedIdentityClientFactory(ctx context.Context, config *AzureProviderConfig) (ManagedIdentityClient, error) {
@@ -72,6 +74,7 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	)
 
 	config.ID = *res.ID
+	config.ManagedIdentityClientID = *res.Properties.ClientID
 
 	if config.KubernetesNamspace != "" {
 		if errAddRole := addWorkloadIdentityRole(ctx, config, fedClient); errAddRole != nil {

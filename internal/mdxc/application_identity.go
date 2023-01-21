@@ -20,18 +20,24 @@ type GCPKubernetesIdentityInputData struct {
 	Namespace          types.String `tfsdk:"namespace"`
 	ServiceAccountName types.String `tfsdk:"service_account_name"`
 }
+
 type AzureApplicationIdentityInputData struct {
-	Placeholder types.String `tfsdk:"placeholder"`
+	Location          types.String                      `tfsdk:"location"`
+	ResourceGroupName types.String                      `tfsdk:"location"`
+	Kubernetes        *AzureKubernetesIdentityInputData `tfsdk:"kubernetes"`
+}
+type AzureKubernetesIdentityInputData struct {
+	Namespace          types.String `tfsdk:"namespace"`
+	ServiceAccountName types.String `tfsdk:"service_account_name"`
+	KubernetesOIDCURL  types.String `tfsdk:"oidc_issuer_url"`
 }
 
 type AWSApplicationIdentityOutputData struct {
 	IAMRoleARN types.String `tfsdk:"iam_role_arn"`
 }
 type AzureApplicationIdentityOutputData struct {
-	ApplicationID            types.String `tfsdk:"application_id"`
-	ServicePrincipalID       types.String `tfsdk:"service_principal_id"`
-	ServicePrincipalClientID types.String `tfsdk:"service_principal_client_id"`
-	ServicePrincipalSecret   types.String `tfsdk:"service_principal_secret"`
+	ApplicationID           types.String `tfsdk:"application_id"`
+	ManagedIdentityClientID types.String `tfsdk:"managed_identity_client_id"`
 }
 type GCPApplicationIdentityOutputData struct {
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
@@ -143,13 +149,29 @@ func runApplicationIdentityFunctionAWS(function applicationIdentityFunctionAWS, 
 type applicationIdentityFunctionAzure func(context.Context, *azure.ApplicationIdentityConfig, azure.ManagedIdentityClient, azure.FederatedIdentityCredentialClient) error
 
 func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData, a *azure.ApplicationIdentityConfig) {
-	a.Name = d.Name.Value
 	a.ID = d.Id.Value
+	a.Name = d.Name.Value
+
+	if d.AzureInput != nil {
+		a.Location = d.AzureInput.Location.Value
+		a.ResourceGroupName = d.AzureInput.ResourceGroupName.Value
+
+		if d.AzureInput.Kubernetes != nil {
+			a.KubernetesNamspace = d.AzureInput.Kubernetes.Namespace.Value
+			a.KubernetesServiceAccountName = d.AzureInput.Kubernetes.ServiceAccountName.Value
+			a.KubernetesOIDCURL = d.AzureInput.Kubernetes.KubernetesOIDCURL.Value
+		}
+	}
 }
 
 func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdentityConfig, d *ApplicationIdentityData) {
-	d.Name = types.String{Value: a.Name}
 	d.Id = types.String{Value: a.ID}
+	d.Name = types.String{Value: a.Name}
+
+	if d.AzureOutput == nil {
+		d.AzureOutput = &AzureApplicationIdentityOutputData{}
+	}
+	d.AzureOutput.ManagedIdentityClientID = types.String{Value: a.ManagedIdentityClientID}
 }
 
 func runApplicationIdentityFunctionAzure(function applicationIdentityFunctionAzure, ctx context.Context, d *ApplicationIdentityData, config *azure.AzureConfig) diag.Diagnostics {
@@ -190,13 +212,9 @@ func convertApplicationIdentityConfigTerraformToGCP(d *ApplicationIdentityData, 
 	a.ServiceAccountEmail = d.Id.Value
 	a.Name = d.Name.Value
 	a.Project = c.Provider.Project.Value
-	if d.GCPInput != nil {
-		if d.GCPInput.Kubernetes != nil {
-			a.KubernetesNamspace = d.GCPInput.Kubernetes.Namespace.Value
-			a.KubernetesServiceAccountName = d.GCPInput.Kubernetes.ServiceAccountName.Value
-		}
-	}
-	if d.GCPOutput != nil {
+	if d.GCPInput != nil && d.GCPInput.Kubernetes != nil {
+		a.KubernetesNamspace = d.GCPInput.Kubernetes.Namespace.Value
+		a.KubernetesServiceAccountName = d.GCPInput.Kubernetes.ServiceAccountName.Value
 	}
 }
 

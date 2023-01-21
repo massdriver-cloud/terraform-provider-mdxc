@@ -34,11 +34,33 @@ var awsApplicationIdentityInputs = tfsdk.Attribute{
 
 var azureApplicationIdentityInputs = tfsdk.Attribute{
 	Optional:    true,
-	Description: "Azure application and service principal configuration",
+	Description: "Azure Managed Identity configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
-		"placeholder": {
+		"location": {
 			Type:     types.StringType,
-			Optional: true,
+			Required: true,
+		},
+		"resource_group_name": {
+			Type:     types.StringType,
+			Required: true,
+		},
+		"kubernetes": {
+			Optional:    true,
+			Description: "Kubernetes configuration",
+			Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
+				"namespace": {
+					Type:     types.StringType,
+					Required: true,
+				},
+				"service_account_name": {
+					Type:     types.StringType,
+					Required: true,
+				},
+				"oidc_issuer_url": {
+					Type:     types.StringType,
+					Required: true,
+				},
+			}),
 		},
 	}),
 }
@@ -77,21 +99,9 @@ var awsApplicationIdentityOutputs = tfsdk.Attribute{
 
 var azureApplicationIdentityOutputs = tfsdk.Attribute{
 	Computed:    true,
-	Description: "Azure application and service principal configuration",
+	Description: "Azure Managed Identity configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
-		"application_id": {
-			Type:     types.StringType,
-			Computed: true,
-		},
-		"service_principal_id": {
-			Type:     types.StringType,
-			Computed: true,
-		},
 		"service_principal_client_id": {
-			Type:     types.StringType,
-			Computed: true,
-		},
-		"service_principal_secret": {
 			Type:     types.StringType,
 			Computed: true,
 		},
@@ -100,7 +110,7 @@ var azureApplicationIdentityOutputs = tfsdk.Attribute{
 
 var gcpApplicationIdentityOutputs = tfsdk.Attribute{
 	Computed:    true,
-	Description: "GCP service account onfiguration",
+	Description: "GCP Service Account configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
 		"service_account_email": {
 			Type:     types.StringType,
