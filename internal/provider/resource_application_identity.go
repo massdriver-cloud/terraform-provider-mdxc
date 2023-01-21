@@ -101,7 +101,15 @@ var azureApplicationIdentityOutputs = tfsdk.Attribute{
 	Computed:    true,
 	Description: "Azure Managed Identity configuration",
 	Attributes: tfsdk.SingleNestedAttributes(map[string]tfsdk.Attribute{
-		"service_principal_client_id": {
+		"client_id": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+		"tenant_id": {
+			Type:     types.StringType,
+			Computed: true,
+		},
+		"resource_id": {
 			Type:     types.StringType,
 			Computed: true,
 		},

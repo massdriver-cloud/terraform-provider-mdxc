@@ -23,21 +23,22 @@ type GCPKubernetesIdentityInputData struct {
 
 type AzureApplicationIdentityInputData struct {
 	Location          types.String                      `tfsdk:"location"`
-	ResourceGroupName types.String                      `tfsdk:"location"`
+	ResourceGroupName types.String                      `tfsdk:"resource_group_name"`
 	Kubernetes        *AzureKubernetesIdentityInputData `tfsdk:"kubernetes"`
 }
 type AzureKubernetesIdentityInputData struct {
 	Namespace          types.String `tfsdk:"namespace"`
 	ServiceAccountName types.String `tfsdk:"service_account_name"`
-	KubernetesOIDCURL  types.String `tfsdk:"oidc_issuer_url"`
+	OIDCURL            types.String `tfsdk:"oidc_issuer_url"`
 }
 
 type AWSApplicationIdentityOutputData struct {
 	IAMRoleARN types.String `tfsdk:"iam_role_arn"`
 }
 type AzureApplicationIdentityOutputData struct {
-	ApplicationID           types.String `tfsdk:"application_id"`
-	ManagedIdentityClientID types.String `tfsdk:"managed_identity_client_id"`
+	ClientID   types.String `tfsdk:"client_id"`
+	TenantID   types.String `tfsdk:"tenant_id"`
+	ResourceID types.String `tfsdk:"resource_id"`
 }
 type GCPApplicationIdentityOutputData struct {
 	ServiceAccountEmail types.String `tfsdk:"service_account_email"`
@@ -159,7 +160,7 @@ func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData
 		if d.AzureInput.Kubernetes != nil {
 			a.KubernetesNamspace = d.AzureInput.Kubernetes.Namespace.Value
 			a.KubernetesServiceAccountName = d.AzureInput.Kubernetes.ServiceAccountName.Value
-			a.KubernetesOIDCURL = d.AzureInput.Kubernetes.KubernetesOIDCURL.Value
+			a.KubernetesOIDCURL = d.AzureInput.Kubernetes.OIDCURL.Value
 		}
 	}
 }
@@ -171,7 +172,9 @@ func convertApplicationIdentityConfigAzureToTerraform(a *azure.ApplicationIdenti
 	if d.AzureOutput == nil {
 		d.AzureOutput = &AzureApplicationIdentityOutputData{}
 	}
-	d.AzureOutput.ManagedIdentityClientID = types.String{Value: a.ManagedIdentityClientID}
+	d.AzureOutput.ClientID = types.String{Value: a.ClientID}
+	d.AzureOutput.TenantID = types.String{Value: a.TenantID}
+	d.AzureOutput.ResourceID = types.String{Value: a.ResourceID}
 }
 
 func runApplicationIdentityFunctionAzure(function applicationIdentityFunctionAzure, ctx context.Context, d *ApplicationIdentityData, config *azure.AzureConfig) diag.Diagnostics {

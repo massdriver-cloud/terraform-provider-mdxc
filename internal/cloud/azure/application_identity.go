@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -24,12 +25,14 @@ type ApplicationIdentityConfig struct {
 	// /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
 	ID                           string
 	Name                         string
-	ManagedIdentityClientID      string
 	Location                     string
 	ResourceGroupName            string
 	KubernetesNamspace           string
 	KubernetesServiceAccountName string
 	KubernetesOIDCURL            string
+	ClientID                     string
+	TenantID                     string
+	ResourceID                   string
 }
 
 func newManagedIdentityClientFactory(ctx context.Context, config *AzureProviderConfig) (ManagedIdentityClient, error) {
@@ -61,7 +64,7 @@ func newFederatedIdentityCredentialClientFactory(ctx context.Context, config *Az
 }
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
-	res, _ := client.CreateOrUpdate(ctx,
+	identity, errCreate := client.CreateOrUpdate(ctx,
 		config.ResourceGroupName,
 		config.Name,
 		armmsi.Identity{
@@ -72,9 +75,16 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 		},
 		nil,
 	)
+	if errCreate != nil {
+		return errCreate
+	}
 
-	config.ID = *res.ID
-	config.ManagedIdentityClientID = *res.Properties.ClientID
+	resourceID := *identity.ID
+	id := strings.Replace(resourceID, "resourcegroup", "resourceGroup", -1)
+	config.ID = *identity.Properties.PrincipalID
+	config.ClientID = *identity.Properties.ClientID
+	config.TenantID = *identity.Properties.TenantID
+	config.ResourceID = id
 
 	if config.KubernetesNamspace != "" {
 		if errAddRole := addWorkloadIdentityRole(ctx, config, fedClient); errAddRole != nil {
@@ -90,8 +100,11 @@ func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityCon
 		return err
 	}
 
-	config.ID = *identity.ID
-	// TODO: the rest
+	id := strings.Replace(*identity.ID, "resourcegroup", "resourceGroup", -1)
+	config.ID = *identity.Properties.PrincipalID
+	config.ClientID = *identity.Properties.ClientID
+	config.TenantID = *identity.Properties.TenantID
+	config.ResourceID = id
 
 	return nil
 }
