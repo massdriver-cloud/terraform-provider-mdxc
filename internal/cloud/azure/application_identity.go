@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -23,7 +24,10 @@ type ApplicationIdentityConfig struct {
 	// /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/{resourceProviderNamespace}/{resourceType}/{resourceName}
 	ID                 string
 	Name               string
+	Location           string
+	ResourceGroupName  string
 	KubernetesNamspace string
+	KubernetesOIDCURL  string
 }
 
 func newManagedIdentityClientFactory(ctx context.Context, config *AzureProviderConfig) (ManagedIdentityClient, error) {
@@ -56,14 +60,13 @@ func newFederatedIdentityCredentialClientFactory(ctx context.Context, config *Az
 
 func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
 	res, _ := client.CreateOrUpdate(ctx,
-		"rgName",
+		config.ResourceGroupName,
 		config.Name,
 		armmsi.Identity{
-			Location: to.Ptr("eastus"),
-			// Tags: map[string]*string{
-			// 	"key1": to.Ptr("value1"),
-			// 	"key2": to.Ptr("value2"),
-			// },
+			Location: &config.Location,
+			Tags: map[string]*string{
+				"managed-by": to.Ptr("massdriver"),
+			},
 		},
 		nil,
 	)
@@ -79,6 +82,14 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func ReadApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
+	identity, err := client.Get(ctx, config.ResourceGroupName, config.Name, nil)
+	if err != nil {
+		return err
+	}
+
+	config.ID = *identity.ID
+	// TODO: the rest
+
 	return nil
 }
 
@@ -87,8 +98,7 @@ func UpdateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityConfig, client ManagedIdentityClient, fedClient FederatedIdentityCredentialClient) error {
-	// We can use the name or get the name from the ID, which is the full resource ID
-	_, err := client.Delete(ctx, "resource-group", config.Name, nil)
+	_, err := client.Delete(ctx, config.ResourceGroupName, config.Name, nil)
 	if err != nil {
 		return err
 	}
@@ -99,24 +109,27 @@ func DeleteApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 }
 
 func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityConfig, client FederatedIdentityCredentialClient) error {
-	res, err := client.CreateOrUpdate(ctx,
-		"rgName",
-		"resourceName",
-		"ficResourceName",
+	_, err := client.CreateOrUpdate(ctx,
+		config.ResourceGroupName,
+		config.Name,
+		// This is the Name of the Federated Identity Credential,
+		// we can use the same name as the resource group, they are guranteed
+		/// to be unique to this application
+		config.Name,
 		armmsi.FederatedIdentityCredential{
 			Properties: &armmsi.FederatedIdentityCredentialProperties{
 				Audiences: []*string{
-					to.Ptr("api://AzureADTokenExchange")},
-				// TODO: need the issuer url from the k8s cluster
-				Issuer: to.Ptr("https://oidc.prod-aks.azure.com/IssuerGUID"),
+					to.Ptr("api://AzureADTokenExchange"),
+				},
+				Issuer: &config.KubernetesOIDCURL,
 				// k8s service account
-				Subject: to.Ptr("system:serviceaccount:ns:svcaccount"),
+				Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", config.KubernetesNamspace, config.Name)),
 			},
 		},
 		nil)
 	if err != nil {
 		return err
 	}
-	config.KubernetesNamspace = *res.Name
+
 	return nil
 }
