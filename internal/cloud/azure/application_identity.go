@@ -27,7 +27,7 @@ type ApplicationIdentityConfig struct {
 	Name                         string
 	Location                     string
 	ResourceGroupName            string
-	KubernetesNamspace           string
+	KubernetesNamespace          string
 	KubernetesServiceAccountName string
 	KubernetesOIDCURL            string
 	ClientID                     string
@@ -80,13 +80,15 @@ func CreateApplicationIdentity(ctx context.Context, config *ApplicationIdentityC
 	}
 
 	resourceID := *identity.ID
+	// yes, this is required. Sometimes the API returned a different case than was valid...
 	id := strings.Replace(resourceID, "resourcegroup", "resourceGroup", -1)
 	config.ID = *identity.Properties.PrincipalID
 	config.ClientID = *identity.Properties.ClientID
 	config.TenantID = *identity.Properties.TenantID
 	config.ResourceID = id
 
-	if config.KubernetesNamspace != "" {
+	// TODO: this is a weak check, we can do better!
+	if config.KubernetesNamespace != "" {
 		if errAddRole := addWorkloadIdentityRole(ctx, config, fedClient); errAddRole != nil {
 			return errAddRole
 		}
@@ -139,7 +141,7 @@ func addWorkloadIdentityRole(ctx context.Context, config *ApplicationIdentityCon
 				},
 				Issuer: &config.KubernetesOIDCURL,
 				// k8s service account
-				Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", config.KubernetesNamspace, config.Name)),
+				Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", config.KubernetesNamespace, config.Name)),
 			},
 		},
 		nil)

@@ -158,7 +158,7 @@ func convertApplicationIdentityConfigTerraformToAzure(d *ApplicationIdentityData
 		a.ResourceGroupName = d.AzureInput.ResourceGroupName.Value
 
 		if d.AzureInput.Kubernetes != nil {
-			a.KubernetesNamspace = d.AzureInput.Kubernetes.Namespace.Value
+			a.KubernetesNamespace = d.AzureInput.Kubernetes.Namespace.Value
 			a.KubernetesServiceAccountName = d.AzureInput.Kubernetes.ServiceAccountName.Value
 			a.KubernetesOIDCURL = d.AzureInput.Kubernetes.OIDCURL.Value
 		}
