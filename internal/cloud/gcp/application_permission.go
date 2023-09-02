@@ -102,7 +102,8 @@ func getProjectIamPolicy(ctx context.Context, service GCPResourceManagerIface, p
 	if errDo != nil {
 		return nil, errDo
 	}
-
+	// The "RequestedPolicyVersion" above isn't guaranteeing version 3, so we force it here
+	policy.Version = 3
 	return policy, nil
 }
 
@@ -140,6 +141,9 @@ func removeFromPolicy(ctx context.Context, config *ApplicationPermissionConfig, 
 
 	policy.Bindings = thirdparty.RemoveBinding(policy.Bindings, &cloudresourcemanager.Binding{
 		Role: role,
+		Condition: &cloudresourcemanager.Expr{
+			Expression: config.Condition,
+		},
 		Members: []string{
 			fmt.Sprintf("serviceAccount:%s", member),
 		},
