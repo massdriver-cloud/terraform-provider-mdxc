@@ -1,14 +1,6 @@
-# Visit https://goreleaser.com for documentation on how to customize this
-# behavior.
-before:
-  hooks:
-    # this is just an example and not a requirement for provider building/publishing
-    - go mod tidy
+version: 2
 builds:
 - env:
-    # goreleaser does not work with CGO, it could also complicate
-    # usage by users in CI/CD systems like Terraform Cloud where
-    # they are unable to install libraries.
     - CGO_ENABLED=0
   mod_timestamp: '{{ .CommitTimestamp }}'
   flags:
@@ -28,6 +20,8 @@ builds:
   ignore:
     - goos: darwin
       goarch: '386'
+    - goos: freebsd
+      goarch: 'arm64'
   binary: '{{ .ProjectName }}_v{{ .Version }}'
 archives:
 - format: zip
@@ -51,10 +45,9 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
-  extra_files:
-    - glob: 'terraform-registry-manifest.json'
-      name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
-  # If you want to manually examine the release before its live, uncomment this line:
+  github:
+    owner: "massdriver-cloud"
+    name: "terraform-provider-mdxc"
   draft: true
 changelog:
-  skip: true
+  disable: true
