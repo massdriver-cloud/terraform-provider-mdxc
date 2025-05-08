@@ -28,6 +28,9 @@ var awsApplicationIdentityInputs = tfsdk.Attribute{
 			Type:        types.StringType,
 			Description: "The AWS IAM role assume role policy. Required if provisioning into AWS",
 			Required:    true,
+			PlanModifiers: tfsdk.AttributePlanModifiers{
+				resource.RequiresReplace(),
+			},
 		},
 	}),
 }
